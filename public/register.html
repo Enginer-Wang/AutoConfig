@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+</head>
+<body>
+    <div class="auth-page">
+        <div class="hero-bg">
+            <div class="hero-gradient"></div>
+            <div class="hero-grid"></div>
+            <div class="floating-orb orb-1"></div>
+            <div class="floating-orb orb-2"></div>
+        </div>
+
+        <div class="auth-card">
+            <div class="auth-logo">
+                <a href="/">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">Autoconfig</span>
+                </a>
+            </div>
+            <h1 class="auth-title">创建账号</h1>
+            <p class="auth-subtitle">加入 Autoconfig，开始极速托管</p>
+
+            <div class="form-error" id="errorMsg"></div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" class="form-input" placeholder="3-20位，字母/数字/下划线" required pattern="[a-zA-Z0-9_-]{3,20}" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="email">邮箱</label>
+                    <input type="email" id="email" class="form-input" placeholder="your@email.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" class="form-input" placeholder="至少6个字符" required minlength="6" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">确认密码</label>
+                    <input type="password" id="confirmPassword" class="form-input" placeholder="再次输入密码" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="form-btn" id="submitBtn">注 册</button>
+            </form>
+
+            <p class="form-footer">
+                已有账号？ <a href="/login">立即登录</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        // 已登录则跳转
+        (async () => {
+            const user = await checkAuth();
+            if (user) window.location.href = '/dashboard';
+        })();
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const errorEl = document.getElementById('errorMsg');
+
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (password !== confirmPassword) {
+                errorEl.textContent = '两次输入的密码不一致';
+                errorEl.classList.add('show');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '注册中...';
+            errorEl.classList.remove('show');
+
+            try {
+                const data = await api('/api/auth/register', {
+                    method: 'POST',
+                    body: {
+                        username: document.getElementById('username').value,
+                        email: document.getElementById('email').value,
+                        password: password
+                    }
+                });
+
+                showToast('注册成功！', 'success');
+                setTimeout(() => window.location.href = '/dashboard', 500);
+            } catch (err) {
+                errorEl.textContent = err.message;
+                errorEl.classList.add('show');
+                btn.disabled = false;
+                btn.textContent = '注 册';
+            }
+        });
+    </script>
+</body>
+</html>

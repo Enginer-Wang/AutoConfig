@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关于我们 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+</head>
+<body>
+    <div class="content-page">
+        <nav class="navbar scrolled">
+            <div class="nav-container">
+                <a href="/" class="nav-logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">Autoconfig</span>
+                </a>
+                <div class="nav-links">
+                    <a href="/about" style="color:var(--text-primary)">关于我们</a>
+                    <a href="/docs">使用文档</a>
+                    <a href="/community">社区广场</a>
+                    <a href="/privacy">隐私政策</a>
+                </div>
+                <div class="nav-actions" id="navActions">
+                    <a href="/login" class="btn-login">登录</a>
+                    <a href="/register" class="btn-register">免费注册</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="content-container">
+            <h1>⚡ 关于 Autoconfig</h1>
+            <p>Autoconfig 是一个专为开发者打造的轻量级静态网页托管平台。我们的使命是让网页发布变得极其简单 — 上传即上线。</p>
+
+            <h2>🎯 我们的愿景</h2>
+            <p>在当今复杂的部署流程中，很多开发者只是想快速分享一个 HTML 页面、展示一个个人简历或测试一个前端原型。传统的托管服务往往需要：</p>
+            <ul>
+                <li>配置 CI/CD 流水线</li>
+                <li>设置服务器和域名</li>
+                <li>处理 SSL 证书</li>
+                <li>管理容器或云服务</li>
+            </ul>
+            <p>Autoconfig 将这一切简化为三步：<strong>上传 → 部署 → 分享</strong>。</p>
+
+            <h2>✨ 核心特性</h2>
+            <ul>
+                <li><strong>秒级部署</strong> — ZIP 上传后自动解压、配置，几秒钟即可上线</li>
+                <li><strong>专属子域名</strong> — 每个用户拥有 <code>username.autoconfig.dev</code> 的独立空间</li>
+                <li><strong>隐私优先</strong> — 默认私密访问，只有你分享的人才能看到</li>
+                <li><strong>社区广场</strong> — 选择公开的项目将展示在社区，获得更多曝光</li>
+                <li><strong>零配置</strong> — 无需任何服务器知识，拖拽即部署</li>
+            </ul>
+
+            <h2>🛠️ 技术栈</h2>
+            <p>Autoconfig 使用现代 Web 技术构建：</p>
+            <ul>
+                <li><strong>后端</strong> — Node.js + Express</li>
+                <li><strong>数据库</strong> — SQLite (轻量、零配置)</li>
+                <li><strong>认证</strong> — JWT Token + Cookie</li>
+                <li><strong>文件处理</strong> — Multer + adm-zip</li>
+                <li><strong>前端</strong> — 原生 HTML/CSS/JS (无框架依赖)</li>
+            </ul>
+
+            <h2>📬 联系我们</h2>
+            <p>如果你有任何问题、建议或合作意向，欢迎通过以下方式联系我们：</p>
+            <ul>
+                <li>GitHub: <a href="https://github.com/Enginer-Wang" target="_blank" style="color:var(--primary-light)">github.com/Enginer-Wang</a></li>
+            </ul>
+        </div>
+
+        <footer class="footer">
+            <div class="footer-container">
+                <div class="footer-bottom">
+                    <p>&copy; 2026 Autoconfig. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        (async () => {
+            const user = await checkAuth();
+            const actions = document.getElementById('navActions');
+            if (user && actions) {
+                actions.innerHTML = `<a href="/dashboard" class="btn-register">控制台</a>`;
+            }
+        })();
+    </script>
+</body>
+</html>

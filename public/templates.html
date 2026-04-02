@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模板商城 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        .store-page{min-height:100vh;background:var(--bg-dark);padding-top:80px}
+        .store-hero{text-align:center;padding:48px 20px 32px}
+        .store-hero h1{font-size:2.2rem;font-weight:800;margin-bottom:8px;background:linear-gradient(135deg,#f1f5f9,#cbd5e1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .store-hero p{color:var(--text-secondary);font-size:1.05rem}
+        .store-coins{display:inline-flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;padding:8px 20px;margin-top:16px;font-size:.9rem;color:var(--text-primary)}
+        .store-coins .coin-val{font-weight:700;color:#eab308}
+        .store-coins .exchange-btn{background:#eab308;color:#000;border:none;padding:4px 12px;border-radius:999px;font-size:.75rem;font-weight:700;cursor:pointer;margin-left:4px}
+        .store-coins .exchange-btn:hover{background:#facc15}
+
+        .store-toolbar{max-width:1100px;margin:0 auto 24px;padding:0 24px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+        .filter-btn{padding:8px 18px;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;color:var(--text-secondary);font-size:.85rem;cursor:pointer;transition:all .2s;font-family:var(--font-sans)}
+        .filter-btn:hover,.filter-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}
+        .store-search{flex:1;min-width:200px;padding:10px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:999px;color:var(--text-primary);font-size:.9rem;outline:none;font-family:var(--font-sans)}
+        .store-search:focus{border-color:var(--primary)}
+
+        .store-grid{max-width:1100px;margin:0 auto;padding:0 24px 60px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+        .tpl-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:all .3s}
+        .tpl-card:hover{border-color:var(--border-hover);transform:translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.2)}
+        .tpl-preview{height:200px;overflow:hidden;position:relative;background:#111}
+        .tpl-preview-inner{width:100%;height:100%;pointer-events:none;overflow:hidden}
+        .tpl-preview iframe{width:200%;height:200%;border:none;transform:scale(.5);transform-origin:0 0;pointer-events:none}
+        .modal-preview iframe{width:100%;height:480px;border:none;background:#fff}
+        .tpl-body{padding:16px}
+        .tpl-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+        .tpl-name{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
+        .tpl-price{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:999px;font-size:.8rem;font-weight:700}
+        .tpl-price.free{background:rgba(34,197,94,.12);color:#4ade80}
+        .tpl-price.paid{background:rgba(234,179,8,.12);color:#eab308}
+        .tpl-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.5;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .tpl-tags{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+        .tpl-tag{padding:2px 8px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.15);border-radius:999px;font-size:.7rem;color:var(--primary-light)}
+        .tpl-footer{display:flex;justify-content:space-between;align-items:center}
+        .tpl-meta{font-size:.75rem;color:var(--text-muted)}
+        .tpl-diff{font-size:.7rem;padding:2px 8px;border-radius:999px}
+        .tpl-diff.easy{background:rgba(34,197,94,.1);color:#4ade80}
+        .tpl-diff.medium{background:rgba(234,179,8,.1);color:#eab308}
+        .tpl-diff.hard{background:rgba(239,68,68,.1);color:#f87171}
+        .tpl-actions{display:flex;gap:8px;margin-top:12px}
+        .btn-tpl{flex:1;padding:10px;border-radius:var(--radius-sm);font-size:.85rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;font-family:var(--font-sans);text-align:center;text-decoration:none}
+        .btn-buy{background:linear-gradient(135deg,#eab308,#f59e0b);color:#000}
+        .btn-buy:hover{box-shadow:0 4px 20px rgba(234,179,8,.3)}
+        .btn-buy.owned{background:var(--bg-card-hover);color:var(--text-secondary);border:1px solid var(--border)}
+        .btn-preview{background:var(--bg-card-hover);color:var(--text-secondary);border:1px solid var(--border)}
+        .btn-preview:hover{border-color:var(--primary);color:var(--primary-light)}
+        .btn-edit{background:var(--gradient-2);color:#fff}
+        .btn-edit:hover{box-shadow:0 4px 20px var(--primary-glow)}
+
+        /* Preview modal */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay.show{display:flex}
+        .modal-content{background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-lg);width:100%;max-width:800px;max-height:90vh;overflow:auto}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
+        .modal-header h3{font-size:1.1rem;color:var(--text-primary)}
+        .modal-close{background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer}
+        .modal-body{padding:0}
+        .modal-preview{width:100%;min-height:300px;overflow:auto}
+        .modal-actions{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end}
+
+        .empty-store{grid-column:1/-1;text-align:center;padding:60px;color:var(--text-muted);font-size:1rem}
+    </style>
+</head>
+<body>
+    <div class="store-page">
+        <nav class="navbar scrolled">
+            <div class="nav-container">
+                <a href="/" class="nav-logo"><span class="logo-icon">⚡</span><span class="logo-text">Autoconfig</span></a>
+                <div class="nav-links">
+                    <a href="/community">社区广场</a>
+                    <a href="/templates" style="color:var(--text-primary)">模板商城</a>
+                    <a href="/leaderboard">排行榜</a>
+                    <a href="/docs">使用文档</a>
+                    <a href="/chat" id="chatNavLink" style="position:relative;display:none">💬<span id="chatBadge" style="position:absolute;top:-6px;right:-10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:700;line-height:16px;text-align:center;display:none"></span></a>
+                </div>
+                <div class="nav-actions" id="navActions">
+                    <a href="/login" class="btn-login">登录</a>
+                    <a href="/register" class="btn-register">免费注册</a>
+                </div>
+            </div>
+        </nav>
+
+        <section class="store-hero">
+            <h1>🏪 模板商城</h1>
+            <p>精选静态网站和小游戏模板，用金币解锁，获取源码自由编辑</p>
+            <div class="store-coins" id="coinBar" style="display:none">
+                🪙 金币余额: <span class="coin-val" id="coinBalance">0</span>
+                <span style="color:var(--text-muted);margin:0 4px">·</span>
+                获赞 <span id="totalLikes">0</span> 次
+                <button class="exchange-btn" onclick="exchangeCoins()" id="exchangeBtn">兑换金币</button>
+            </div>
+        </section>
+
+        <div class="store-toolbar">
+            <button class="filter-btn active" onclick="filter('all',this)">全部</button>
+            <button class="filter-btn" onclick="filter('website',this)">🌐 网站</button>
+            <button class="filter-btn" onclick="filter('game',this)">🎮 游戏</button>
+            <span style="color:var(--text-muted);font-size:.85rem;margin:0 4px">|</span>
+            <button class="filter-btn" onclick="filterDiff('all',this)" data-group="diff">全部难度</button>
+            <button class="filter-btn" onclick="filterDiff('easy',this)" data-group="diff">🟢 简单</button>
+            <button class="filter-btn" onclick="filterDiff('medium',this)" data-group="diff">🟡 中等</button>
+            <button class="filter-btn" onclick="filterDiff('hard',this)" data-group="diff">🔴 高级</button>
+            <input type="text" class="store-search" id="searchInput" placeholder="搜索模板...">
+        </div>
+
+        <div class="store-grid" id="storeGrid">
+            <div class="empty-store">加载中...</div>
+        </div>
+
+        <!-- 预览弹窗 -->
+        <div class="modal-overlay" id="previewModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">预览</h3>
+                    <button class="modal-close" onclick="closeModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-preview" id="modalPreview"></div>
+                </div>
+                <div class="modal-actions" id="modalActions"></div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <div class="footer-container"><div class="footer-bottom"><p>&copy; 2026 Autoconfig. All rights reserved.</p></div></div>
+        </footer>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        let currentUser = null;
+        let allTemplates = [];
+        let currentCategory = 'all';
+        let currentDiff = 'all';
+        let purchasedIds = new Set();
+
+        (async () => {
+            currentUser = await checkAuth();
+            const actions = document.getElementById('navActions');
+            if (currentUser) {
+                actions.innerHTML = `<a href="/dashboard" class="btn-register">控制台</a>`;
+                document.getElementById('coinBar').style.display = 'inline-flex';
+                loadCoins();
+                loadMyTemplates();
+                // Show chat icon with unread badge
+                document.getElementById('chatNavLink').style.display = '';
+                try {
+                    const ud = await api('/api/chat/unread');
+                    if (ud.unread > 0) {
+                        const badge = document.getElementById('chatBadge');
+                        badge.textContent = ud.unread > 99 ? '99+' : ud.unread;
+                        badge.style.display = '';
+                    }
+                } catch {}
+            }
+            loadTemplates();
+        })();
+
+        async function loadCoins() {
+            try {
+                const data = await api('/api/store/coins');
+                document.getElementById('coinBalance').textContent = data.coins;
+                document.getElementById('totalLikes').textContent = data.totalLikes;
+                if (data.canExchange > 0) {
+                    document.getElementById('exchangeBtn').textContent = `兑换 ${data.canExchange} 金币`;
+                    document.getElementById('exchangeBtn').style.display = '';
+                } else {
+                    document.getElementById('exchangeBtn').style.display = 'none';
+                }
+            } catch {}
+        }
+
+        async function loadMyTemplates() {
+            try {
+                const data = await api('/api/store/my');
+                data.templates.forEach(t => purchasedIds.add(t.id));
+            } catch {}
+        }
+
+        async function exchangeCoins() {
+            try {
+                const data = await api('/api/store/coins/exchange', { method: 'POST' });
+                showToast(data.message, 'success');
+                loadCoins();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function loadTemplates() {
+            const search = document.getElementById('searchInput').value;
+            try {
+                let url = `/api/store/list?category=${currentCategory}&difficulty=${currentDiff}`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
+                const data = await api(url);
+                allTemplates = data.templates;
+                renderTemplates(data.templates);
+            } catch { document.getElementById('storeGrid').innerHTML = '<div class="empty-store">加载失败</div>'; }
+        }
+
+        function renderTemplates(templates) {
+            const grid = document.getElementById('storeGrid');
+            if (templates.length === 0) {
+                grid.innerHTML = '<div class="empty-store">📭 暂无匹配的模板</div>';
+                return;
+            }
+
+            grid.innerHTML = templates.map(t => {
+                const owned = t.price === 0 || purchasedIds.has(t.id);
+                const diffMap = { easy: ['🟢 简单', 'easy'], medium: ['🟡 中等', 'medium'], hard: ['🔴 高级', 'hard'] };
+                const [diffLabel, diffClass] = diffMap[t.difficulty] || ['', ''];
+                return `
+                <div class="tpl-card">
+                    <div class="tpl-preview"><div class="tpl-preview-inner"><iframe srcdoc="${escAttr(t.preview_html || '')}" sandbox="allow-scripts" loading="lazy"></iframe></div></div>
+                    <div class="tpl-body">
+                        <div class="tpl-header">
+                            <div class="tpl-name">${esc(t.name)}</div>
+                            ${t.price === 0 ? '<span class="tpl-price free">免费</span>' : `<span class="tpl-price paid">🪙 ${t.price}</span>`}
+                        </div>
+                        <div class="tpl-desc">${esc(t.description)}</div>
+                        <div class="tpl-tags">${(t.tags||'').split(',').filter(Boolean).map(tag => `<span class="tpl-tag">${esc(tag.trim())}</span>`).join('')}</div>
+                        <div class="tpl-footer">
+                            <span class="tpl-diff ${diffClass}">${diffLabel}</span>
+                            <span class="tpl-meta">📥 ${t.download_count} 次获取</span>
+                        </div>
+                        <div class="tpl-actions">
+                            <button class="btn-tpl btn-preview" onclick="previewTemplate('${t.slug}')">👁 预览</button>
+                            ${owned
+                                ? `<a href="/editor/${t.id}" class="btn-tpl btn-edit">✏️ 编辑源码</a>`
+                                : (currentUser
+                                    ? `<button class="btn-tpl btn-buy" onclick="buyTemplate(${t.id},'${esc(t.name)}',${t.price})">🪙 ${t.price} 金币购买</button>`
+                                    : `<a href="/login" class="btn-tpl btn-buy">登录后购买</a>`)
+                            }
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function previewTemplate(slug) {
+            try {
+                const data = await api(`/api/store/detail/${slug}`);
+                document.getElementById('modalTitle').textContent = data.template.name;
+                // Build full preview HTML from template source
+                let previewHtml = data.template.html_content || data.template.preview_html || '';
+                if (data.template.css_content && previewHtml.includes('</head>')) {
+                    previewHtml = previewHtml.replace('</head>', '<style>' + data.template.css_content + '</style></head>');
+                } else if (data.template.css_content) {
+                    previewHtml = '<style>' + data.template.css_content + '</style>' + previewHtml;
+                }
+                if (data.template.js_content && previewHtml.includes('</body>')) {
+                    previewHtml = previewHtml.replace('</body>', '<script>' + data.template.js_content + '<\/script></body>');
+                } else if (data.template.js_content) {
+                    previewHtml += '<script>' + data.template.js_content + '<\/script>';
+                }
+                const iframe = document.createElement('iframe');
+                iframe.sandbox = 'allow-scripts';
+                iframe.srcdoc = previewHtml;
+                document.getElementById('modalPreview').innerHTML = '';
+                document.getElementById('modalPreview').appendChild(iframe);
+                const owned = data.purchased;
+                document.getElementById('modalActions').innerHTML = owned
+                    ? `<a href="/editor/${data.template.id}" class="btn-tpl btn-edit" style="width:auto;padding:10px 24px">✏️ 编辑源码</a>`
+                    : (data.template.price === 0
+                        ? `<button class="btn-tpl btn-buy" onclick="buyTemplate(${data.template.id},'${esc(data.template.name)}',0);closeModal()" style="width:auto;padding:10px 24px">免费获取</button>`
+                        : `<button class="btn-tpl btn-buy" onclick="buyTemplate(${data.template.id},'${esc(data.template.name)}',${data.template.price});closeModal()" style="width:auto;padding:10px 24px">🪙 ${data.template.price} 金币购买</button>`);
+                document.getElementById('previewModal').classList.add('show');
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function closeModal() {
+            document.getElementById('previewModal').classList.remove('show');
+        }
+
+        async function buyTemplate(id, name, price) {
+            if (!currentUser) { window.location.href = '/login'; return; }
+            if (price > 0 && !confirm(`确定花费 ${price} 金币购买「${name}」？`)) return;
+            try {
+                const data = await api(`/api/store/buy/${id}`, { method: 'POST' });
+                showToast(data.message, 'success');
+                purchasedIds.add(id);
+                loadCoins();
+                renderTemplates(allTemplates);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function filter(cat, el) {
+            currentCategory = cat;
+            document.querySelectorAll('.filter-btn:not([data-group])').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            loadTemplates();
+        }
+
+        function filterDiff(diff, el) {
+            currentDiff = diff;
+            document.querySelectorAll('.filter-btn[data-group="diff"]').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            loadTemplates();
+        }
+
+        let searchTimer;
+        document.getElementById('searchInput').addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(loadTemplates, 300);
+        });
+
+        document.getElementById('previewModal').addEventListener('click', e => {
+            if (e.target === document.getElementById('previewModal')) closeModal();
+        });
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function escAttr(s) { if (!s) return ''; return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    </script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用文档 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+</head>
+<body>
+    <div class="content-page">
+        <!-- 导航栏 -->
+        <nav class="navbar scrolled">
+            <div class="nav-container">
+                <a href="/" class="nav-logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">Autoconfig</span>
+                </a>
+                <div class="nav-links">
+                    <a href="/about">关于我们</a>
+                    <a href="/docs" style="color:var(--text-primary)">使用文档</a>
+                    <a href="/community">社区广场</a>
+                    <a href="/privacy">隐私政策</a>
+                </div>
+                <div class="nav-actions" id="navActions">
+                    <a href="/login" class="btn-login">登录</a>
+                    <a href="/register" class="btn-register">免费注册</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="content-container">
+            <h1>📖 使用文档</h1>
+            <p>欢迎使用 Autoconfig 静态网页托管平台。以下文档将帮助你快速上手。</p>
+
+            <h2>🚀 快速开始</h2>
+            <h3>第一步：准备你的项目文件</h3>
+            <p>将你的静态网页项目打包成 <code>.zip</code> 文件。项目中至少应该包含一个 <code>index.html</code> 文件作为入口页面。</p>
+            <p>支持的项目类型：</p>
+            <ul>
+                <li>纯 HTML/CSS/JS 静态网页</li>
+                <li>React 构建产物（<code>npm run build</code> 后的 <code>build/</code> 或 <code>dist/</code> 目录）</li>
+                <li>Vue 构建产物（<code>npm run build</code> 后的 <code>dist/</code> 目录）</li>
+                <li>Next.js 静态导出（<code>next export</code> 后的 <code>out/</code> 目录）</li>
+                <li>任何静态网站生成器的输出</li>
+            </ul>
+
+            <h3>第二步：上传部署</h3>
+            <p>登录后进入<a href="/dashboard">控制台</a>，将 ZIP 文件拖拽到上传区域，或点击选择文件。</p>
+            <p>填写项目信息：</p>
+            <ul>
+                <li><strong>项目名称</strong> - 项目的显示名称</li>
+                <li><strong>项目路径 (slug)</strong> - 访问地址中的路径部分，如 <code>my-project</code></li>
+                <li><strong>项目描述</strong> - 可选，项目的简短介绍</li>
+                <li><strong>是否公开</strong> - 勾选后项目将出现在社区广场</li>
+            </ul>
+
+            <h3>第三步：访问你的站点</h3>
+            <p>部署成功后，你将获得一个专属链接：</p>
+            <pre><code>https://你的用户名.autoconfig.dev/项目路径</code></pre>
+            <p>在本地开发环境中，访问地址为：</p>
+            <pre><code>http://localhost:3000/site/你的用户名/项目路径</code></pre>
+
+            <h2>📂 项目管理</h2>
+            <h3>重新部署</h3>
+            <p>上传同名 slug 的项目时，系统会自动替换原有文件，实现无缝更新。</p>
+
+            <h3>删除项目</h3>
+            <p>在控制台点击项目卡片上的「删除」按钮。注意：此操作不可撤销，所有文件将被永久删除。</p>
+
+            <h3>公开/私密切换</h3>
+            <p>每个项目可以在公开和私密之间切换：</p>
+            <ul>
+                <li><strong>公开</strong> - 项目会出现在社区广场，任何人都可以浏览</li>
+                <li><strong>私密</strong> - 只有知道链接的人才能访问</li>
+            </ul>
+
+            <h2>🌐 社区广场</h2>
+            <p>社区广场展示所有公开的项目。你可以：</p>
+            <ul>
+                <li>浏览其他开发者的作品</li>
+                <li>搜索感兴趣的项目</li>
+                <li>获取灵感和学习</li>
+            </ul>
+
+            <h2>⚙️ 技术规格</h2>
+            <ul>
+                <li>单个项目最大 <strong>50MB</strong></li>
+                <li>支持 HTML、CSS、JavaScript、图片等所有静态资源</li>
+                <li>自动识别并跳过 ZIP 中的根目录包裹</li>
+                <li>SPA 单页应用路由兼容（自动 fallback 到 index.html）</li>
+            </ul>
+
+            <h2>❓ 常见问题</h2>
+            <h3>为什么上传后页面是空白的？</h3>
+            <p>请确保你的 ZIP 文件中包含 <code>index.html</code> 文件。如果你的 HTML 文件在子目录中，请确保 ZIP 的结构正确。</p>
+
+            <h3>如何更新已部署的项目？</h3>
+            <p>使用相同的项目路径 (slug) 重新上传即可。系统会自动替换旧文件。</p>
+
+            <h3>项目链接会过期吗？</h3>
+            <p>不会。只要你不手动删除项目，链接将一直有效。</p>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <div class="footer-bottom">
+                    <p>&copy; 2026 Autoconfig. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        (async () => {
+            const user = await checkAuth();
+            const actions = document.getElementById('navActions');
+            if (user && actions) {
+                actions.innerHTML = `<a href="/dashboard" class="btn-register">控制台</a>`;
+            }
+        })();
+    </script>
+</body>
+</html>

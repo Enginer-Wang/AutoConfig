@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>源码编辑器 - Autoconfig</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;overflow:hidden}
+        .editor-page{height:100vh;display:flex;flex-direction:column;position:relative}
+        .editor-header{display:flex;align-items:center;gap:16px;padding:8px 16px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0}
+        .editor-header .logo{display:flex;align-items:center;gap:6px;color:#f0f6fc;text-decoration:none;font-weight:700;font-size:1rem}
+        .editor-header .logo .icon{font-size:1.2rem}
+        .editor-title{flex:1;font-size:.88rem;color:#8b949e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .editor-title strong{color:#f0f6fc}
+        .editor-actions{display:flex;gap:8px}
+        .editor-btn{padding:6px 14px;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid #30363d;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:4px}
+        .btn-run{background:#238636;border-color:#238636;color:#fff}.btn-run:hover{background:#2ea043}
+        .btn-deploy{background:#1f6feb;border-color:#1f6feb;color:#fff}.btn-deploy:hover{background:#388bfd}
+        .btn-back{background:transparent;color:#8b949e}.btn-back:hover{color:#f0f6fc}
+
+        .editor-body{display:flex;flex:1;overflow:hidden}
+        .editor-panels{display:flex;flex:1;overflow:hidden}
+        .editor-code-panel{flex:1;display:flex;flex-direction:column;min-width:0}
+        .editor-tabs{display:flex;gap:0;background:#0d1117;border-bottom:1px solid #30363d}
+        .editor-tab{padding:8px 16px;font-size:.82rem;color:#8b949e;cursor:pointer;border-bottom:2px solid transparent;font-family:"Consolas","Courier New",monospace;background:transparent;border-top:none;border-left:none;border-right:none;transition:all .15s}
+        .editor-tab:hover{color:#f0f6fc}.editor-tab.active{color:#f0f6fc;border-bottom-color:#f78166;background:#161b22}
+        .editor-textarea{flex:1;width:100%;padding:16px;background:#0d1117;color:#c9d1d9;border:none;resize:none;font-family:"Consolas","Courier New",monospace;font-size:14px;line-height:1.6;tab-size:2;outline:none}
+        .editor-textarea::placeholder{color:#484f58}
+        .editor-preview-panel{width:50%;border-left:1px solid #30363d;display:flex;flex-direction:column}
+        .preview-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#161b22;border-bottom:1px solid #30363d;font-size:.8rem;color:#8b949e}
+        .preview-frame{flex:1;border:none;width:100%;background:#fff}
+        .editor-status{padding:4px 12px;background:#161b22;border-top:1px solid #30363d;font-size:.75rem;color:#484f58;display:flex;justify-content:space-between}
+        .loading-overlay{position:absolute;inset:0;background:rgba(13,17,23,.95);display:flex;align-items:center;justify-content:center;z-index:100;font-size:1.1rem;color:#8b949e;flex-direction:column;gap:12px}
+        .loading-overlay.hidden{display:none}
+        .loading-spinner{width:32px;height:32px;border:3px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .toast-container{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+        .toast{padding:10px 20px;border-radius:8px;font-size:.85rem;color:#fff;animation:fadeIn .3s}
+        .toast-success{background:#238636}.toast-error{background:#da3633}.toast-info{background:#1f6feb}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+        @media(max-width:768px){.editor-panels{flex-direction:column}.editor-preview-panel{width:100%;height:40%;border-left:none;border-top:1px solid #30363d}}
+    </style>
+</head>
+<body>
+    <div class="editor-page">
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <span>加载源码中...</span>
+        </div>
+        <header class="editor-header">
+            <a href="/dashboard" class="logo"><span class="icon">⚡</span> Autoconfig</a>
+            <div class="editor-title" id="editorTitle">编辑器</div>
+            <div class="editor-actions">
+                <button class="editor-btn btn-back" id="backBtn" onclick="goBack()">← 返回</button>
+                <button class="editor-btn btn-run" onclick="runPreview()">▶ 预览</button>
+                <button class="editor-btn btn-deploy" onclick="deployProject()">🚀 部署发布</button>
+            </div>
+        </header>
+        <div class="editor-body">
+            <div class="editor-panels">
+                <div class="editor-code-panel">
+                    <div class="editor-tabs">
+                        <button class="editor-tab active" onclick="switchFile('html',this)">index.html</button>
+                        <button class="editor-tab" onclick="switchFile('css',this)">style.css</button>
+                        <button class="editor-tab" onclick="switchFile('js',this)">script.js</button>
+                    </div>
+                    <textarea class="editor-textarea" id="codeEditor" spellcheck="false" placeholder="// 在此编辑代码..."></textarea>
+                </div>
+                <div class="editor-preview-panel">
+                    <div class="preview-header">
+                        <span>🖥 实时预览</span>
+                        <button class="editor-btn btn-back" onclick="runPreview()" style="padding:2px 8px;font-size:.75rem">🔄 刷新</button>
+                    </div>
+                    <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-modals allow-popups"></iframe>
+                </div>
+            </div>
+        </div>
+        <div class="editor-status">
+            <span id="statusLeft">就绪</span>
+            <span id="statusRight">Autoconfig Editor</span>
+        </div>
+    </div>
+
+    <script>
+        // ===== Toast =====
+        function showToast(msg, type='info') {
+            let c = document.querySelector('.toast-container');
+            if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); }
+            const t = document.createElement('div'); t.className = 'toast toast-' + type; t.textContent = msg; c.appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // ===== API Helper =====
+        async function api(url, opts = {}) {
+            const res = await fetch(url, {
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                ...opts,
+                body: opts.body ? JSON.stringify(opts.body) : undefined
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '请求失败');
+            return data;
+        }
+
+        let currentUser = null;
+        let files = { html: '', css: '', js: '' };
+        let currentFile = 'html';
+        let mode = 'template'; // 'template' or 'project'
+        let templateData = null;
+        let projectData = null;
+
+        const editor = document.getElementById('codeEditor');
+
+        // Detect mode from URL path
+        const pathParts = window.location.pathname.split('/');
+        const resourceId = pathParts[pathParts.length - 1];
+
+        if (pathParts[1] === 'edit-project') {
+            mode = 'project';
+        }
+
+        // ===== Init =====
+        (async () => {
+            // Auth check
+            try {
+                const data = await api('/api/auth/me');
+                currentUser = data.user;
+            } catch {
+                window.location.href = '/login';
+                return;
+            }
+
+            try {
+                if (mode === 'template') {
+                    // Load template source
+                    const data = await api('/api/store/source/' + resourceId);
+                    templateData = data.template;
+                    files.html = data.template.html_content || '';
+                    files.css = data.template.css_content || '';
+                    files.js = data.template.js_content || '';
+                    document.getElementById('editorTitle').innerHTML = '模板: <strong>' + esc(data.template.name) + '</strong>';
+                } else {
+                    // Load project source
+                    const data = await api('/api/projects/' + resourceId + '/source');
+                    projectData = data.project;
+                    files.html = data.source.html || '';
+                    files.css = data.source.css || '';
+                    files.js = data.source.js || '';
+                    document.getElementById('editorTitle').innerHTML = '项目: <strong>' + esc(data.project.name) + '</strong>';
+                }
+
+                editor.value = files.html;
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                runPreview();
+                updateStatus();
+            } catch (err) {
+                document.getElementById('loadingOverlay').innerHTML = '<span style="color:#f87171">❌ 加载失败: ' + esc(err.message) + '</span>';
+            }
+        })();
+
+        function goBack() {
+            if (mode === 'project') location.href = '/dashboard';
+            else location.href = '/templates';
+        }
+
+        function switchFile(type, el) {
+            files[currentFile] = editor.value;
+            currentFile = type;
+            editor.value = files[type];
+            document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            updateStatus();
+        }
+
+        editor.addEventListener('input', () => {
+            files[currentFile] = editor.value;
+            updateStatus();
+        });
+
+        // Tab & Ctrl+S support
+        editor.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = editor.selectionStart;
+                editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(editor.selectionEnd);
+                editor.selectionStart = editor.selectionEnd = start + 2;
+                files[currentFile] = editor.value;
+            }
+            if (e.ctrlKey && e.key === 's') { e.preventDefault(); runPreview(); }
+        });
+
+        function buildFullHtml() {
+            let html = files.html;
+            if (!html.includes('<html') && !html.includes('<HTML')) {
+                return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' + files.css + '</style></head><body>' + html + '<script>' + files.js + '<\/script></body></html>';
+            }
+            // Inject CSS inline for preview
+            if (files.css) {
+                if (/<link[^>]*href=["']style\.css["'][^>]*>/i.test(html)) {
+                    html = html.replace(/<link[^>]*href=["']style\.css["'][^>]*>/i, '<style>' + files.css + '</style>');
+                } else if (html.includes('</head>')) {
+                    html = html.replace('</head>', '<style>' + files.css + '</style></head>');
+                }
+            }
+            // Inject JS inline for preview
+            if (files.js) {
+                if (/<script[^>]*src=["']script\.js["'][^>]*><\/script>/i.test(html)) {
+                    html = html.replace(/<script[^>]*src=["']script\.js["'][^>]*><\/script>/i, '<script>' + files.js + '<\/script>');
+                } else if (html.includes('</body>')) {
+                    html = html.replace('</body>', '<script>' + files.js + '<\/script></body>');
+                }
+            }
+            return html;
+        }
+
+        function runPreview() {
+            files[currentFile] = editor.value;
+            const frame = document.getElementById('previewFrame');
+            frame.srcdoc = buildFullHtml();
+            document.getElementById('statusLeft').textContent = '✅ 预览已更新 — ' + new Date().toLocaleTimeString();
+        }
+
+        async function deployProject() {
+            files[currentFile] = editor.value;
+
+            let name, slug, description;
+            if (mode === 'project' && projectData) {
+                name = projectData.name;
+                slug = projectData.slug;
+                description = projectData.description || '';
+                if (!confirm('确定重新部署项目「' + name + '」？')) return;
+            } else {
+                name = prompt('项目名称:', templateData ? templateData.name : '我的项目');
+                if (!name) return;
+                slug = name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'my-project';
+                description = '基于模板「' + (templateData ? templateData.name : '自定义') + '」创建';
+            }
+
+            try {
+                document.getElementById('statusLeft').textContent = '🚀 部署中...';
+
+                let deployHtml = files.html;
+                if (!deployHtml.includes('<html') && !deployHtml.includes('<HTML')) {
+                    deployHtml = '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>' + esc(name) + '</title>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n' + deployHtml + '\n<script src="script.js"><\/script>\n</body>\n</html>';
+                }
+
+                const res = await api('/api/projects/deploy-template', {
+                    method: 'POST',
+                    body: {
+                        name: name,
+                        slug: slug,
+                        description: description,
+                        isPublic: true,
+                        files: {
+                            'index.html': deployHtml,
+                            'style.css': files.css,
+                            'script.js': files.js
+                        }
+                    }
+                });
+
+                showToast('🎉 部署成功！', 'success');
+                document.getElementById('statusLeft').textContent = '✅ 部署成功！';
+
+                if (res.project) {
+                    projectData = res.project;
+                    mode = 'project';
+                }
+
+                if (confirm('部署成功！是否前往查看？')) {
+                    window.location.href = '/project/' + currentUser.username + '/' + res.project.slug;
+                }
+            } catch (err) {
+                showToast(err.message, 'error');
+                document.getElementById('statusLeft').textContent = '❌ 部署失败';
+            }
+        }
+
+        function updateStatus() {
+            const lines = editor.value.split('\n').length;
+            const chars = editor.value.length;
+            document.getElementById('statusRight').textContent = '行 ' + lines + ' · 字符 ' + chars + ' · ' + currentFile.toUpperCase();
+        }
+
+        function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    </script>
+</body>
+</html>

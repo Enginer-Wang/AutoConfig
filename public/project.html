@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作品展示 - Autoconfig</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        .showcase-page { min-height: 100vh; background: var(--bg-dark); padding-top: 80px; }
+
+        .showcase-container {
+            max-width: 900px; margin: 0 auto; padding: 32px 24px;
+            display: grid; grid-template-columns: 1fr 280px; gap: 32px;
+            align-items: start;
+        }
+
+        /* 主内容区 */
+        .showcase-main { min-width: 0; }
+
+        .showcase-title {
+            font-size: 2rem; font-weight: 800; margin-bottom: 16px;
+            background: linear-gradient(135deg, #f1f5f9, #cbd5e1);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+
+        .showcase-desc {
+            font-size: 1rem; color: var(--text-secondary); line-height: 1.7; margin-bottom: 24px;
+        }
+
+        /* 操作栏 */
+        .showcase-actions {
+            display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap;
+        }
+
+        .action-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 24px; border-radius: var(--radius-sm);
+            font-size: 0.95rem; font-weight: 600; cursor: pointer;
+            transition: var(--transition); font-family: var(--font-sans); border: none;
+        }
+
+        .btn-visit-site {
+            background: var(--gradient-2); color: white;
+            box-shadow: 0 4px 20px var(--primary-glow);
+        }
+        .btn-visit-site:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--primary-glow); }
+
+        .btn-like {
+            background: var(--bg-card); color: var(--text-secondary);
+            border: 1px solid var(--border) !important;
+        }
+        .btn-like:hover { background: var(--bg-card-hover); border-color: var(--border-hover) !important; }
+        .btn-like.liked { background: rgba(239, 68, 68, 0.1); color: #f87171; border-color: rgba(239, 68, 68, 0.3) !important; }
+
+        .like-count { font-weight: 700; }
+
+        /* 项目信息卡片 */
+        .showcase-info-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 24px; backdrop-filter: blur(10px);
+        }
+
+        .info-section { margin-bottom: 24px; }
+        .info-section:last-child { margin-bottom: 0; }
+
+        .info-section-title {
+            font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;
+            letter-spacing: 0.05em; font-weight: 600; margin-bottom: 12px;
+        }
+
+        /* 作者信息 */
+        .author-info { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .author-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--gradient-2); display: flex; align-items: center;
+            justify-content: center; font-size: 1.1rem; font-weight: 700; color: white;
+        }
+        .author-name { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
+        .author-joined { font-size: 0.8rem; color: var(--text-muted); }
+
+        .author-bio { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px; }
+
+        .btn-contact-author {
+            display: block; width: 100%; padding: 10px; text-align: center;
+            background: var(--bg-card-hover); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); color: var(--text-secondary);
+            font-size: 0.85rem; font-weight: 600; cursor: pointer;
+            transition: var(--transition); font-family: var(--font-sans);
+        }
+        .btn-contact-author:hover { color: var(--text-primary); border-color: var(--border-hover); }
+
+        /* 项目统计 */
+        .project-stats-list { display: flex; flex-direction: column; gap: 10px; }
+
+        .project-stat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.88rem;
+        }
+        .project-stat-row .label { color: var(--text-muted); }
+        .project-stat-row .value { color: var(--text-primary); font-weight: 600; }
+
+        /* iframe 预览 */
+        .showcase-preview {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 32px;
+        }
+
+        .preview-header {
+            display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+            border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02);
+        }
+
+        .preview-dots { display: flex; gap: 6px; }
+        .preview-dots span { width: 10px; height: 10px; border-radius: 50%; }
+        .preview-dots .red { background: #ef4444; }
+        .preview-dots .yellow { background: #eab308; }
+        .preview-dots .green { background: #22c55e; }
+
+        .preview-url {
+            flex: 1; background: rgba(255,255,255,0.05); padding: 6px 12px;
+            border-radius: 6px; font-size: 0.8rem; color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .preview-iframe {
+            width: 100%; height: 400px; border: none; background: white;
+        }
+
+        /* 评论区 */
+        .comments-section { margin-top: 32px; }
+
+        .comments-title {
+            font-size: 1.1rem; font-weight: 700; color: var(--text-primary);
+            margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+        }
+
+        .comment-form {
+            display: flex; gap: 12px; margin-bottom: 24px;
+        }
+
+        .comment-input {
+            flex: 1; padding: 12px 16px; background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text-primary); font-size: 0.9rem; font-family: var(--font-sans);
+            outline: none; transition: var(--transition); resize: none;
+        }
+        .comment-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+
+        .btn-comment {
+            padding: 12px 20px; background: var(--gradient-2); color: white;
+            border: none; border-radius: var(--radius-sm); font-size: 0.9rem;
+            font-weight: 600; cursor: pointer; font-family: var(--font-sans);
+            transition: var(--transition); white-space: nowrap;
+        }
+        .btn-comment:hover { box-shadow: 0 4px 20px var(--primary-glow); }
+        .btn-comment:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .comment-login-hint {
+            padding: 16px; text-align: center; background: var(--bg-card);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px;
+        }
+        .comment-login-hint a { color: var(--primary-light); font-weight: 600; }
+
+        .comments-list { display: flex; flex-direction: column; gap: 16px; }
+
+        .comment-item {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius-md); padding: 16px; transition: var(--transition);
+        }
+
+        .comment-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .comment-avatar {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: var(--gradient-2); display: flex; align-items: center;
+            justify-content: center; font-size: 0.7rem; font-weight: 700; color: white;
+        }
+        .comment-author { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
+        .comment-time { font-size: 0.75rem; color: var(--text-muted); margin-left: auto; }
+
+        .comment-content { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
+
+        .comment-delete {
+            font-size: 0.75rem; color: var(--text-muted); cursor: pointer;
+            background: none; border: none; margin-left: 8px; font-family: var(--font-sans);
+        }
+        .comment-delete:hover { color: #f87171; }
+
+        .no-comments { text-align: center; padding: 32px; color: var(--text-muted); font-size: 0.9rem; }
+
+        /* 标签 */
+        .showcase-tags { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tag {
+            padding: 4px 12px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 9999px; font-size: 0.78rem; color: var(--primary-light);
+        }
+
+        @media (max-width: 768px) {
+            .showcase-container { grid-template-columns: 1fr; }
+            .showcase-info-card { order: -1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="showcase-page">
+        <!-- 导航栏 -->
+        <nav class="navbar scrolled">
+            <div class="nav-container">
+                <a href="/" class="nav-logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">Autoconfig</span>
+                </a>
+                <div class="nav-links">
+                    <a href="/community">社区广场</a>
+                    <a href="/templates">模板商城</a>
+                    <a href="/leaderboard">排行榜</a>
+                    <a href="/docs">使用文档</a>
+                    <a href="/chat" id="chatNavLink" style="position:relative;display:none">💬<span id="chatBadge" style="position:absolute;top:-6px;right:-10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:700;line-height:16px;text-align:center;display:none"></span></a>
+                </div>
+                <div class="nav-actions" id="navActions">
+                    <a href="/login" class="btn-login">登录</a>
+                    <a href="/register" class="btn-register">免费注册</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="showcase-container">
+            <!-- 左侧主内容 -->
+            <div class="showcase-main">
+                <h1 class="showcase-title" id="projectTitle">加载中...</h1>
+                <p class="showcase-desc" id="projectDesc"></p>
+
+                <div class="showcase-tags" id="projectTags"></div>
+
+                <div class="showcase-actions">
+                    <a id="visitSiteBtn" href="#" target="_blank" class="action-btn btn-visit-site">
+                        🌐 访问原站
+                    </a>
+                    <button class="action-btn btn-like" id="likeBtn" onclick="toggleLike()">
+                        <span id="likeIcon">🤍</span>
+                        <span>点赞</span>
+                        <span class="like-count" id="likeCount">0</span>
+                    </button>
+                </div>
+
+                <!-- 站点预览 -->
+                <div class="showcase-preview">
+                    <div class="preview-header">
+                        <div class="preview-dots">
+                            <span class="red"></span>
+                            <span class="yellow"></span>
+                            <span class="green"></span>
+                        </div>
+                        <div class="preview-url" id="previewUrl">加载中...</div>
+                    </div>
+                    <iframe class="preview-iframe" id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+                </div>
+
+                <!-- 评论区 -->
+                <div class="comments-section">
+                    <div class="comments-title">
+                        💬 评论 (<span id="commentCount">0</span>)
+                    </div>
+
+                    <div id="commentFormArea"></div>
+
+                    <div class="comments-list" id="commentsList">
+                        <div class="no-comments">暂无评论，快来抢沙发吧！</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧信息卡片 -->
+            <div class="showcase-sidebar">
+                <div class="showcase-info-card">
+                    <!-- 作者信息 -->
+                    <div class="info-section">
+                        <div class="info-section-title">关于作者</div>
+                        <div class="author-info">
+                            <div class="author-avatar" id="authorAvatar">?</div>
+                            <div>
+                                <div class="author-name" id="authorName">-</div>
+                                <div class="author-joined" id="authorJoined">-</div>
+                            </div>
+                        </div>
+                        <div class="author-bio" id="authorBio"></div>
+                        <a href="#" class="btn-contact-author" id="contactAuthorBtn" style="display:none">登录后联系作者</a>
+                    </div>
+
+                    <!-- 项目信息 -->
+                    <div class="info-section">
+                        <div class="info-section-title">项目信息</div>
+                        <div class="project-stats-list">
+                            <div class="project-stat-row">
+                                <span class="label">发布时间</span>
+                                <span class="value" id="infoDeployed">-</span>
+                            </div>
+                            <div class="project-stat-row">
+                                <span class="label">简介</span>
+                                <span class="value" id="infoDesc">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 统计 -->
+                    <div class="info-section">
+                        <div class="info-section-title">统计</div>
+                        <div class="project-stats-list">
+                            <div class="project-stat-row">
+                                <span class="label">👀 访问量</span>
+                                <span class="value" id="infoVisits">0</span>
+                            </div>
+                            <div class="project-stat-row">
+                                <span class="label">❤️ 点赞</span>
+                                <span class="value" id="infoLikes">0</span>
+                            </div>
+                            <div class="project-stat-row">
+                                <span class="label">📄 文件数</span>
+                                <span class="value" id="infoFiles">0</span>
+                            </div>
+                            <div class="project-stat-row">
+                                <span class="label">💾 大小</span>
+                                <span class="value" id="infoSize">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <div class="footer-bottom">
+                    <p>本网页由 <a href="/" style="color:var(--primary-light)">Autoconfig</a> 免费托管 · 拖拽 HTML 秒变公网网站</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/js/common.js"></script>
+    <script>
+        let projectData = null;
+        let currentUser = null;
+
+        // 从 URL 解析 username 和 slug
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const username = pathParts[1];
+        const slug = pathParts[2];
+
+        // 初始化
+        (async () => {
+            currentUser = await checkAuth();
+            const actions = document.getElementById('navActions');
+            if (currentUser && actions) {
+                actions.innerHTML = '<a href="/dashboard" class="btn-register">控制台</a>';
+                // Show chat nav with unread badge
+                document.getElementById('chatNavLink').style.display = '';
+                try {
+                    const ud = await api('/api/chat/unread');
+                    if (ud.unread > 0) {
+                        const badge = document.getElementById('chatBadge');
+                        badge.textContent = ud.unread > 99 ? '99+' : ud.unread;
+                        badge.style.display = '';
+                    }
+                } catch {}
+            }
+
+            try {
+                const data = await api(`/api/community/project/${username}/${slug}`);
+                projectData = data;
+                renderProject(data);
+            } catch (err) {
+                document.getElementById('projectTitle').textContent = '项目未找到';
+                document.getElementById('projectDesc').textContent = err.message;
+            }
+        })();
+
+        function renderProject(data) {
+            const { project, likeCount, hasLiked, comments, author } = data;
+
+            // 标题和描述
+            document.title = `${project.name} - Autoconfig`;
+            document.getElementById('projectTitle').textContent = project.name;
+            document.getElementById('projectDesc').textContent = project.description || '暂无描述';
+
+            // 标签
+            const tags = document.getElementById('projectTags');
+            tags.innerHTML = `
+                <span class="tag">${project.is_public ? '🌐 公开' : '🔒 私密'}</span>
+                <span class="tag">📄 ${project.file_count} 个文件</span>
+            `;
+
+            // 访问链接
+            const siteUrl = `/site/${username}/${slug}`;
+            document.getElementById('visitSiteBtn').href = siteUrl;
+
+            // 点赞
+            document.getElementById('likeCount').textContent = likeCount;
+            document.getElementById('infoLikes').textContent = likeCount;
+            if (hasLiked) {
+                document.getElementById('likeBtn').classList.add('liked');
+                document.getElementById('likeIcon').textContent = '❤️';
+            }
+
+            // 预览
+            document.getElementById('previewUrl').textContent = `${username}.autoconfig.dev/${slug}`;
+            document.getElementById('previewFrame').src = siteUrl;
+
+            // 作者信息
+            document.getElementById('authorAvatar').textContent = author.username[0].toUpperCase();
+            document.getElementById('authorName').textContent = author.username;
+            document.getElementById('authorJoined').textContent = `已加入 ${author.joined_days} 天`;
+            if (author.bio) {
+                document.getElementById('authorBio').textContent = author.bio;
+            }
+
+            const contactBtn = document.getElementById('contactAuthorBtn');
+            contactBtn.style.display = 'block';
+            if (currentUser) {
+                if (currentUser.username === author.username) {
+                    contactBtn.textContent = '这是你自己的项目';
+                    contactBtn.style.opacity = '0.5';
+                    contactBtn.style.pointerEvents = 'none';
+                } else {
+                    contactBtn.textContent = '💬 联系作者';
+                    contactBtn.href = '/chat/' + author.username;
+                }
+            } else {
+                contactBtn.textContent = '登录后联系作者';
+                contactBtn.href = '/login';
+            }
+
+            // 项目统计
+            document.getElementById('infoDeployed').textContent = new Date(project.deployed_at).toLocaleDateString('zh-CN');
+            document.getElementById('infoDesc').textContent = project.description || '-';
+            document.getElementById('infoVisits').textContent = project.visit_count;
+            document.getElementById('infoFiles').textContent = project.file_count;
+            document.getElementById('infoSize').textContent = formatSize(project.total_size);
+
+            // 评论
+            renderComments(comments);
+            renderCommentForm();
+        }
+
+        function renderCommentForm() {
+            const area = document.getElementById('commentFormArea');
+            if (currentUser) {
+                area.innerHTML = `
+                    <form class="comment-form" onsubmit="submitComment(event)">
+                        <input type="text" class="comment-input" id="commentInput" placeholder="写下你的评论..." maxlength="500">
+                        <button type="submit" class="btn-comment" id="commentBtn">发表</button>
+                    </form>
+                `;
+            } else {
+                area.innerHTML = `
+                    <div class="comment-login-hint">
+                        请 <a href="/login">登录</a> 后发表评论
+                    </div>
+                `;
+            }
+        }
+
+        function renderComments(comments) {
+            const list = document.getElementById('commentsList');
+            document.getElementById('commentCount').textContent = comments.length;
+
+            if (comments.length === 0) {
+                list.innerHTML = '<div class="no-comments">暂无评论，快来抢沙发吧！</div>';
+                return;
+            }
+
+            list.innerHTML = comments.map(c => `
+                <div class="comment-item">
+                    <div class="comment-header">
+                        <div class="comment-avatar">${c.username[0].toUpperCase()}</div>
+                        <span class="comment-author">${escapeHtml(c.username)}</span>
+                        <span class="comment-time">${formatDate(c.created_at)}</span>
+                        ${currentUser && currentUser.id === c.user_id ? `<button class="comment-delete" onclick="deleteComment(${c.id})">删除</button>` : ''}
+                    </div>
+                    <div class="comment-content">${escapeHtml(c.content)}</div>
+                </div>
+            `).join('');
+        }
+
+        // 点赞
+        async function toggleLike() {
+            if (!currentUser) {
+                showToast('请先登录', 'info');
+                window.location.href = '/login';
+                return;
+            }
+
+            try {
+                const data = await api(`/api/community/project/${projectData.project.id}/like`, { method: 'POST' });
+                document.getElementById('likeCount').textContent = data.count;
+                document.getElementById('infoLikes').textContent = data.count;
+
+                const btn = document.getElementById('likeBtn');
+                const icon = document.getElementById('likeIcon');
+                if (data.liked) {
+                    btn.classList.add('liked');
+                    icon.textContent = '❤️';
+                    showToast('点赞成功！', 'success');
+                } else {
+                    btn.classList.remove('liked');
+                    icon.textContent = '🤍';
+                }
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        // 发表评论
+        async function submitComment(e) {
+            e.preventDefault();
+            const input = document.getElementById('commentInput');
+            const btn = document.getElementById('commentBtn');
+            const content = input.value.trim();
+
+            if (!content) return;
+
+            btn.disabled = true;
+            try {
+                const data = await api(`/api/community/project/${projectData.project.id}/comment`, {
+                    method: 'POST',
+                    body: { content }
+                });
+
+                input.value = '';
+                projectData.comments.unshift(data.comment);
+                renderComments(projectData.comments);
+                showToast('评论成功！', 'success');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+            btn.disabled = false;
+        }
+
+        // 删除评论
+        async function deleteComment(id) {
+            if (!confirm('确定要删除这条评论吗？')) return;
+            try {
+                await api(`/api/community/comment/${id}`, { method: 'DELETE' });
+                projectData.comments = projectData.comments.filter(c => c.id !== id);
+                renderComments(projectData.comments);
+                showToast('评论已删除', 'success');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

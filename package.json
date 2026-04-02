@@ -1,0 +1,27 @@
+{
+    "name": "autoconfig",
+    "version": "1.0.0",
+    "description": "Autoconfig - 极速托管你的个人网页与项目",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node server.js"
+    },
+    "keywords": [
+        "yunmind",
+        "hosting",
+        "static",
+        "landing-page"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "adm-zip": "^0.5.17",
+        "bcryptjs": "^3.0.3",
+        "better-sqlite3": "^12.8.0",
+        "cookie-parser": "^1.4.7",
+        "express": "^5.2.1",
+        "jsonwebtoken": "^9.0.3",
+        "multer": "^2.1.1"
+    }
+}

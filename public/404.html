@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        .page-404 {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: var(--bg-dark);
+            position: relative;
+            overflow: hidden;
+        }
+        .page-404 .hero-gradient {
+            position: absolute; inset: 0;
+            background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(99, 102, 241, 0.1) 0%, transparent 60%);
+        }
+        .page-404-content {
+            position: relative; z-index: 1;
+        }
+        .page-404-code {
+            font-size: 8rem;
+            font-weight: 900;
+            line-height: 1;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+        .page-404-text {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+        .page-404 .btn {
+            display: inline-flex;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-404">
+        <div class="hero-gradient"></div>
+        <div class="page-404-content">
+            <div class="page-404-code">404</div>
+            <div class="page-404-text">页面未找到，可能跑到另一个维度了 ⚡</div>
+            <a href="/" class="btn btn-primary">返回首页</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        .admin-layout { display: flex; min-height: 100vh; background: #0a0a1a; }
+        .admin-sidebar { width: 240px; background: rgba(15,15,35,.95); border-right: 1px solid rgba(255,255,255,.06); padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; z-index: 100; }
+        .admin-sidebar .logo { display: flex; align-items: center; gap: 10px; padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,.06); margin-bottom: 16px; }
+        .admin-sidebar .logo-icon { font-size: 1.5rem; }
+        .admin-sidebar .logo-text { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; }
+        .admin-sidebar .logo-badge { font-size: .65rem; background: linear-gradient(135deg, #f59e0b, #ef4444); padding: 2px 8px; border-radius: 10px; color: #fff; font-weight: 600; }
+        .admin-sidebar .nav-group { margin-bottom: 8px; }
+        .admin-sidebar .nav-label { font-size: .7rem; text-transform: uppercase; color: #475569; padding: 8px 20px 4px; letter-spacing: 1px; }
+        .admin-sidebar .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #94a3b8; font-size: .9rem; cursor: pointer; transition: all .2s; text-decoration: none; border-left: 3px solid transparent; }
+        .admin-sidebar .nav-item:hover { background: rgba(99,102,241,.08); color: #e2e8f0; }
+        .admin-sidebar .nav-item.active { background: rgba(99,102,241,.12); color: #818cf8; border-left-color: #818cf8; }
+        .admin-sidebar .nav-item .icon { font-size: 1.1rem; width: 24px; text-align: center; }
+        .admin-main { flex: 1; margin-left: 240px; padding: 24px 32px; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .admin-header h1 { font-size: 1.5rem; color: #f1f5f9; }
+        .admin-header .user-info { display: flex; align-items: center; gap: 12px; color: #94a3b8; font-size: .9rem; }
+        .admin-header .user-info .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #ef4444); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: .8rem; }
+
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+        .stat-card { background: rgba(30,30,60,.5); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 20px; }
+        .stat-card .stat-icon { font-size: 1.5rem; margin-bottom: 8px; }
+        .stat-card .stat-value { font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .stat-card .stat-label { font-size: .8rem; color: #64748b; margin-top: 4px; }
+
+        /* Panel */
+        .panel { background: rgba(30,30,60,.5); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; margin-bottom: 24px; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,.06); }
+        .panel-header h2 { font-size: 1.1rem; color: #f1f5f9; }
+        .panel-body { padding: 16px 20px; }
+        .panel-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+        /* Table */
+        .data-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        .data-table th { text-align: left; padding: 10px 12px; color: #64748b; font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid rgba(255,255,255,.06); }
+        .data-table td { padding: 12px; color: #cbd5e1; border-bottom: 1px solid rgba(255,255,255,.03); vertical-align: middle; }
+        .data-table tr:hover td { background: rgba(99,102,241,.04); }
+        .data-table .username { color: #818cf8; font-weight: 600; }
+        .data-table .badge { font-size: .7rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .badge-admin { background: rgba(239,68,68,.15); color: #f87171; }
+        .badge-user { background: rgba(99,102,241,.15); color: #a5b4fc; }
+        .badge-public { background: rgba(34,197,94,.15); color: #4ade80; }
+        .badge-private { background: rgba(148,163,184,.15); color: #94a3b8; }
+
+        /* Buttons */
+        .btn { padding: 6px 14px; border: none; border-radius: 8px; font-size: .8rem; cursor: pointer; font-family: inherit; transition: all .2s; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+        .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+        .btn-success { background: rgba(34,197,94,.15); color: #4ade80; border: 1px solid rgba(34,197,94,.2); }
+        .btn-success:hover { background: rgba(34,197,94,.25); }
+        .btn-warning { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.2); }
+        .btn-warning:hover { background: rgba(245,158,11,.25); }
+        .btn-danger { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.2); }
+        .btn-danger:hover { background: rgba(239,68,68,.25); }
+        .btn-sm { padding: 4px 10px; font-size: .75rem; }
+
+        /* Form */
+        .form-input { width: 100%; padding: 8px 12px; background: rgba(15,15,35,.8); border: 1px solid rgba(255,255,255,.1); border-radius: 8px; color: #e2e8f0; font-size: .85rem; font-family: inherit; outline: none; }
+        .form-input:focus { border-color: #6366f1; }
+        .form-input-sm { padding: 6px 10px; font-size: .8rem; width: auto; min-width: 180px; }
+        .form-select { padding: 6px 10px; background: rgba(15,15,35,.8); border: 1px solid rgba(255,255,255,.1); border-radius: 8px; color: #e2e8f0; font-size: .8rem; font-family: inherit; outline: none; cursor: pointer; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: .8rem; color: #94a3b8; margin-bottom: 6px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: #1a1a2e; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; width: 90%; max-width: 520px; max-height: 85vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,.06); }
+        .modal-header h3 { font-size: 1.1rem; color: #f1f5f9; }
+        .modal-close { background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; padding: 4px; }
+        .modal-close:hover { color: #f87171; }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.06); display: flex; justify-content: flex-end; gap: 10px; }
+
+        /* Coins badge */
+        .coins { color: #eab308; font-weight: 700; }
+
+        /* Section tabs */
+        .section-tabs { display: none; }
+        .section-tabs.active { display: block; }
+
+        /* Empty */
+        .empty-msg { text-align: center; color: #64748b; padding: 40px; font-size: .9rem; }
+
+        /* Actions dropdown */
+        .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- 侧边栏 -->
+        <aside class="admin-sidebar">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Autoconfig</span>
+                <span class="logo-badge">ADMIN</span>
+            </div>
+            <div class="nav-group">
+                <div class="nav-label">概览</div>
+                <a class="nav-item active" onclick="switchTab('dashboard')"><span class="icon">📊</span> 系统仪表盘</a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-label">管理</div>
+                <a class="nav-item" onclick="switchTab('users')"><span class="icon">👥</span> 用户管理</a>
+                <a class="nav-item" onclick="switchTab('projects')"><span class="icon">📁</span> 项目管理</a>
+                <a class="nav-item" onclick="switchTab('templates')"><span class="icon">🎨</span> 模板管理</a>
+            </div>
+            <div class="nav-group">
+                <div class="nav-label">操作</div>
+                <a class="nav-item" onclick="switchTab('coins')"><span class="icon">🪙</span> 金币管理</a>
+            </div>
+            <div class="nav-group" style="margin-top: auto; border-top: 1px solid rgba(255,255,255,.06); padding-top: 12px;">
+                <a class="nav-item" href="/dashboard"><span class="icon">🏠</span> 返回主站</a>
+                <a class="nav-item" onclick="logout()" style="cursor:pointer"><span class="icon">🚪</span> 退出登录</a>
+            </div>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="admin-main">
+            <div class="admin-header">
+                <h1 id="pageTitle">📊 系统仪表盘</h1>
+                <div class="user-info">
+                    <span id="adminName">admin</span>
+                    <div class="avatar">👑</div>
+                </div>
+            </div>
+
+            <!-- ===== 仪表盘 ===== -->
+            <div id="tab-dashboard" class="section-tabs active">
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+
+            <!-- ===== 用户管理 ===== -->
+            <div id="tab-users" class="section-tabs">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>👥 用户列表</h2>
+                        <div class="panel-toolbar">
+                            <input class="form-input form-input-sm" id="userSearch" placeholder="搜索用户名/邮箱..." oninput="debounce(loadUsers, 300)()">
+                            <select class="form-select" id="userRoleFilter" onchange="loadUsers()">
+                                <option value="all">全部角色</option>
+                                <option value="admin">管理员</option>
+                                <option value="user">普通用户</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="showCreateUserModal()">+ 创建用户</button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>金币</th><th>项目</th><th>获赞</th><th>注册时间</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="usersTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 项目管理 ===== -->
+            <div id="tab-projects" class="section-tabs">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📁 所有项目</h2>
+                        <div class="panel-toolbar">
+                            <input class="form-input form-input-sm" id="projectSearch" placeholder="搜索项目/用户名..." oninput="debounce(loadProjects, 300)()">
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>ID</th><th>项目名</th><th>作者</th><th>状态</th><th>文件</th><th>访问量</th><th>赞</th><th>评论</th><th>更新时间</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="projectsTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 模板管理 ===== -->
+            <div id="tab-templates" class="section-tabs">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>🎨 模板列表</h2>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>ID</th><th>名称</th><th>分类</th><th>难度</th><th>价格</th><th>购买数</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="templatesTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 金币管理 ===== -->
+            <div id="tab-coins" class="section-tabs">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>🪙 金币操作</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div style="max-width: 480px;">
+                            <h3 style="color:#f1f5f9; margin-bottom: 16px; font-size: 1rem;">单用户充值/扣除</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>用户 ID</label>
+                                    <input class="form-input" id="coinUserId" type="number" placeholder="输入用户ID">
+                                </div>
+                                <div class="form-group">
+                                    <label>金币数量（负数为扣除）</label>
+                                    <input class="form-input" id="coinAmount" type="number" placeholder="例: 100 或 -50">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>备注原因</label>
+                                <input class="form-input" id="coinReason" placeholder="可选，例：活动奖励">
+                            </div>
+                            <button class="btn btn-primary" onclick="addCoins()">💰 执行操作</button>
+
+                            <hr style="border-color: rgba(255,255,255,.06); margin: 32px 0;">
+
+                            <h3 style="color:#f1f5f9; margin-bottom: 16px; font-size: 1rem;">全服发放</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>每人金币数量</label>
+                                    <input class="form-input" id="batchAmount" type="number" placeholder="例: 10">
+                                </div>
+                                <div class="form-group">
+                                    <label>备注原因</label>
+                                    <input class="form-input" id="batchReason" placeholder="例：节日福利">
+                                </div>
+                            </div>
+                            <button class="btn btn-warning" onclick="batchCoins()">🎁 全服发放</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 用户编辑模态框 -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="userModalTitle">编辑用户</h3>
+                <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editUserId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>用户名</label>
+                        <input class="form-input" id="editUsername" placeholder="用户名">
+                    </div>
+                    <div class="form-group">
+                        <label>邮箱</label>
+                        <input class="form-input" id="editEmail" placeholder="email@example.com">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>密码（留空不修改）</label>
+                        <input class="form-input" id="editPassword" type="password" placeholder="新密码">
+                    </div>
+                    <div class="form-group">
+                        <label>角色</label>
+                        <select class="form-input" id="editRole">
+                            <option value="user">普通用户</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>金币</label>
+                        <input class="form-input" id="editCoins" type="number" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>简介</label>
+                        <input class="form-input" id="editBio" placeholder="个人简介">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('userModal')">取消</button>
+                <button class="btn btn-primary" id="userModalSave" onclick="saveUser()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        let currentTab = 'dashboard';
+
+        // ===== 初始化 =====
+        (async () => {
+            const user = await checkAuth();
+            if (!user || user.role !== 'admin') {
+                showToast('需要管理员权限', 'error');
+                setTimeout(() => window.location.href = '/login', 1000);
+                return;
+            }
+            document.getElementById('adminName').textContent = user.username;
+            loadDashboard();
+        })();
+
+        // ===== Tab 切换 =====
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.section-tabs').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            event.currentTarget.classList.add('active');
+
+            const titles = {
+                dashboard: '📊 系统仪表盘',
+                users: '👥 用户管理',
+                projects: '📁 项目管理',
+                templates: '🎨 模板管理',
+                coins: '🪙 金币管理'
+            };
+            document.getElementById('pageTitle').textContent = titles[tab] || tab;
+
+            if (tab === 'dashboard') loadDashboard();
+            if (tab === 'users') loadUsers();
+            if (tab === 'projects') loadProjects();
+            if (tab === 'templates') loadTemplates();
+        }
+
+        // ===== 仪表盘 =====
+        async function loadDashboard() {
+            try {
+                const stats = await api('/api/admin/stats');
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">${stats.user_count}</div><div class="stat-label">总用户数</div></div>
+                    <div class="stat-card"><div class="stat-icon">📁</div><div class="stat-value">${stats.project_count}</div><div class="stat-label">总项目数</div></div>
+                    <div class="stat-card"><div class="stat-icon">🌐</div><div class="stat-value">${stats.public_project_count}</div><div class="stat-label">公开项目</div></div>
+                    <div class="stat-card"><div class="stat-icon">👀</div><div class="stat-value">${stats.total_visits}</div><div class="stat-label">总访问量</div></div>
+                    <div class="stat-card"><div class="stat-icon">❤️</div><div class="stat-value">${stats.like_count}</div><div class="stat-label">总点赞数</div></div>
+                    <div class="stat-card"><div class="stat-icon">💬</div><div class="stat-value">${stats.comment_count}</div><div class="stat-label">总评论数</div></div>
+                    <div class="stat-card"><div class="stat-icon">🎨</div><div class="stat-value">${stats.template_count}</div><div class="stat-label">模板数量</div></div>
+                    <div class="stat-card"><div class="stat-icon">🛒</div><div class="stat-value">${stats.purchase_count}</div><div class="stat-label">购买次数</div></div>
+                    <div class="stat-card"><div class="stat-icon">🪙</div><div class="stat-value">${stats.total_coins}</div><div class="stat-label">金币流通</div></div>
+                    <div class="stat-card"><div class="stat-icon">💳</div><div class="stat-value">${stats.transaction_count}</div><div class="stat-label">交易记录</div></div>
+                `;
+            } catch (e) {
+                showToast('加载统计失败: ' + e.message, 'error');
+            }
+        }
+
+        // ===== 用户管理 =====
+        async function loadUsers() {
+            try {
+                const search = document.getElementById('userSearch').value;
+                const role = document.getElementById('userRoleFilter').value;
+                const data = await api(`/api/admin/users?search=${encodeURIComponent(search)}&role=${role}`);
+                const tbody = document.getElementById('usersTable');
+
+                if (data.users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9" class="empty-msg">没有找到用户</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.users.map(u => `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td class="username">${esc(u.username)}</td>
+                        <td>${esc(u.email)}</td>
+                        <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${u.role === 'admin' ? '👑 管理员' : '用户'}</span></td>
+                        <td class="coins">🪙 ${u.coins}</td>
+                        <td>${u.project_count}</td>
+                        <td>❤️ ${u.total_likes}</td>
+                        <td>${formatDate(u.created_at)}</td>
+                        <td class="actions-cell">
+                            <button class="btn btn-sm btn-primary" onclick="editUser(${u.id})">✏️ 编辑</button>
+                            <button class="btn btn-sm btn-success" onclick="quickAddCoins(${u.id}, '${esc(u.username)}')">🪙 充值</button>
+                            ${u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id}, '${esc(u.username)}')">🗑 删除</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                showToast('加载用户失败: ' + e.message, 'error');
+            }
+        }
+
+        function showCreateUserModal() {
+            document.getElementById('userModalTitle').textContent = '创建用户';
+            document.getElementById('editUserId').value = '';
+            document.getElementById('editUsername').value = '';
+            document.getElementById('editEmail').value = '';
+            document.getElementById('editPassword').value = '';
+            document.getElementById('editPassword').placeholder = '密码（必填）';
+            document.getElementById('editRole').value = 'user';
+            document.getElementById('editCoins').value = '0';
+            document.getElementById('editBio').value = '';
+            document.getElementById('userModalSave').textContent = '创建';
+            openModal('userModal');
+        }
+
+        async function editUser(id) {
+            try {
+                const data = await api(`/api/admin/users/${id}`);
+                const u = data.user;
+                document.getElementById('userModalTitle').textContent = `编辑用户: ${u.username}`;
+                document.getElementById('editUserId').value = u.id;
+                document.getElementById('editUsername').value = u.username;
+                document.getElementById('editEmail').value = u.email;
+                document.getElementById('editPassword').value = '';
+                document.getElementById('editPassword').placeholder = '留空不修改';
+                document.getElementById('editRole').value = u.role || 'user';
+                document.getElementById('editCoins').value = u.coins;
+                document.getElementById('editBio').value = u.bio || '';
+                document.getElementById('userModalSave').textContent = '保存';
+                openModal('userModal');
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function saveUser() {
+            const id = document.getElementById('editUserId').value;
+            const body = {
+                username: document.getElementById('editUsername').value,
+                email: document.getElementById('editEmail').value,
+                role: document.getElementById('editRole').value,
+                coins: parseInt(document.getElementById('editCoins').value) || 0,
+                bio: document.getElementById('editBio').value
+            };
+            const password = document.getElementById('editPassword').value;
+            if (password) body.password = password;
+
+            try {
+                if (id) {
+                    await api(`/api/admin/users/${id}`, { method: 'PUT', body });
+                    showToast('用户已更新', 'success');
+                } else {
+                    if (!password) { showToast('创建用户需要设置密码', 'error'); return; }
+                    body.password = password;
+                    await api('/api/admin/users', { method: 'POST', body });
+                    showToast('用户已创建', 'success');
+                }
+                closeModal('userModal');
+                loadUsers();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function deleteUser(id, username) {
+            if (!confirm(`确定要删除用户「${username}」吗？\n\n⚠️ 该用户的所有项目和数据将被永久删除！`)) return;
+            try {
+                await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+                showToast(`用户 ${username} 已删除`, 'success');
+                loadUsers();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function quickAddCoins(userId, username) {
+            const amount = prompt(`给用户「${username}」充值金币：\n（输入正数充值，负数扣除）`);
+            if (amount === null) return;
+            const num = parseInt(amount);
+            if (isNaN(num) || num === 0) { showToast('请输入有效的数字', 'error'); return; }
+            try {
+                const data = await api(`/api/admin/users/${userId}/coins`, {
+                    method: 'POST',
+                    body: { amount: num, reason: `管理员操作` }
+                });
+                showToast(data.message, 'success');
+                loadUsers();
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        // ===== 项目管理 =====
+        async function loadProjects() {
+            try {
+                const search = document.getElementById('projectSearch').value;
+                const data = await api(`/api/admin/projects?search=${encodeURIComponent(search)}`);
+                const tbody = document.getElementById('projectsTable');
+
+                if (data.projects.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" class="empty-msg">没有找到项目</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.projects.map(p => `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td><a href="/site/${esc(p.username)}/${esc(p.slug)}" target="_blank" style="color:#818cf8;text-decoration:none">${esc(p.name)}</a></td>
+                        <td class="username">${esc(p.username)}</td>
+                        <td><span class="badge ${p.is_public ? 'badge-public' : 'badge-private'}">${p.is_public ? '🌐 公开' : '🔒 私密'}</span></td>
+                        <td>${p.file_count} 个</td>
+                        <td>👀 ${p.visit_count}</td>
+                        <td>❤️ ${p.like_count}</td>
+                        <td>💬 ${p.comment_count}</td>
+                        <td>${formatDate(p.updated_at)}</td>
+                        <td class="actions-cell">
+                            <button class="btn btn-sm btn-primary" onclick="toggleProjectPublic(${p.id}, ${p.is_public})">${p.is_public ? '🔒 设为私密' : '🌐 设为公开'}</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id}, '${esc(p.name)}')">🗑 删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                showToast('加载项目失败: ' + e.message, 'error');
+            }
+        }
+
+        async function toggleProjectPublic(id, current) {
+            try {
+                await api(`/api/admin/projects/${id}`, { method: 'PUT', body: { isPublic: !current } });
+                showToast(current ? '已设为私密' : '已设为公开', 'success');
+                loadProjects();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function deleteProject(id, name) {
+            if (!confirm(`确定删除项目「${name}」？此操作不可撤销。`)) return;
+            try {
+                await api(`/api/admin/projects/${id}`, { method: 'DELETE' });
+                showToast(`项目 ${name} 已删除`, 'success');
+                loadProjects();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        // ===== 模板管理 =====
+        async function loadTemplates() {
+            try {
+                const data = await api('/api/admin/templates');
+                const tbody = document.getElementById('templatesTable');
+
+                tbody.innerHTML = data.templates.map(t => `
+                    <tr>
+                        <td>${t.id}</td>
+                        <td>${esc(t.name)}</td>
+                        <td>${t.category === 'game' ? '🎮 游戏' : '🌐 网站'}</td>
+                        <td>${{easy:'🟢 简单', medium:'🟡 中等', hard:'🔴 困难'}[t.difficulty] || t.difficulty}</td>
+                        <td class="coins">🪙 ${t.price}</td>
+                        <td>${t.purchase_count} 次</td>
+                        <td class="actions-cell">
+                            <button class="btn btn-sm btn-warning" onclick="editTemplatePrice(${t.id}, '${esc(t.name)}', ${t.price})">💰 改价</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteTemplate(${t.id}, '${esc(t.name)}')">🗑 删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                showToast('加载模板失败: ' + e.message, 'error');
+            }
+        }
+
+        async function editTemplatePrice(id, name, currentPrice) {
+            const newPrice = prompt(`修改模板「${name}」的价格：\n当前价格: ${currentPrice} 金币`, currentPrice);
+            if (newPrice === null) return;
+            try {
+                await api(`/api/admin/templates/${id}`, { method: 'PUT', body: { price: parseInt(newPrice) } });
+                showToast(`价格已更新为 ${newPrice} 金币`, 'success');
+                loadTemplates();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function deleteTemplate(id, name) {
+            if (!confirm(`确定删除模板「${name}」？`)) return;
+            try {
+                await api(`/api/admin/templates/${id}`, { method: 'DELETE' });
+                showToast(`模板已删除`, 'success');
+                loadTemplates();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        // ===== 金币操作 =====
+        async function addCoins() {
+            const userId = document.getElementById('coinUserId').value;
+            const amount = document.getElementById('coinAmount').value;
+            const reason = document.getElementById('coinReason').value;
+
+            if (!userId || !amount) { showToast('请填写用户ID和金币数量', 'error'); return; }
+            try {
+                const data = await api(`/api/admin/users/${userId}/coins`, {
+                    method: 'POST',
+                    body: { amount: parseInt(amount), reason }
+                });
+                showToast(data.message, 'success');
+                document.getElementById('coinUserId').value = '';
+                document.getElementById('coinAmount').value = '';
+                document.getElementById('coinReason').value = '';
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function batchCoins() {
+            const amount = document.getElementById('batchAmount').value;
+            const reason = document.getElementById('batchReason').value;
+            if (!amount || parseInt(amount) <= 0) { showToast('请输入正数金币数量', 'error'); return; }
+            if (!confirm(`确定向所有用户发放 ${amount} 金币？`)) return;
+            try {
+                const data = await api('/api/admin/coins/batch', {
+                    method: 'POST',
+                    body: { amount: parseInt(amount), reason }
+                });
+                showToast(data.message, 'success');
+                document.getElementById('batchAmount').value = '';
+                document.getElementById('batchReason').value = '';
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        // ===== 工具 =====
+        function openModal(id) { document.getElementById(id).classList.add('show'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        let debounceTimers = {};
+        function debounce(fn, delay) {
+            return function() {
+                clearTimeout(debounceTimers[fn.name]);
+                debounceTimers[fn.name] = setTimeout(fn, delay);
+            };
+        }
+    </script>
+</body>
+</html>

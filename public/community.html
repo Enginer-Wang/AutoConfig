@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社区广场 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+</head>
+<body>
+    <div class="community-page">
+        <!-- 导航栏 -->
+        <nav class="navbar scrolled" id="navbar">
+            <div class="nav-container">
+                <a href="/" class="nav-logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">Autoconfig</span>
+                </a>
+                <div class="nav-links" id="navLinks">
+                    <a href="/community" style="color:var(--text-primary)">社区广场</a>
+                    <a href="/templates">模板商城</a>
+                    <a href="/leaderboard">排行榜</a>
+                    <a href="/docs">使用文档</a>
+                </div>
+                <div class="nav-actions" id="navActions">
+                    <a href="/login" class="btn-login">登录</a>
+                    <a href="/register" class="btn-register">免费注册</a>
+                </div>
+                <button class="nav-toggle" id="navToggle" aria-label="切换导航">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Hero -->
+        <section class="community-hero">
+            <h1>🌐 社区广场</h1>
+            <p>发现其他开发者的精彩作品，获取灵感</p>
+            <div class="community-stats" id="communityStats">
+                <div class="community-stat">
+                    <div class="community-stat-value" id="statUsers">-</div>
+                    <div class="community-stat-label">注册用户</div>
+                </div>
+                <div class="community-stat">
+                    <div class="community-stat-value" id="statPublic">-</div>
+                    <div class="community-stat-label">公开项目</div>
+                </div>
+                <div class="community-stat">
+                    <div class="community-stat-value" id="statAllVisits">-</div>
+                    <div class="community-stat-label">总访问量</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 搜索 -->
+        <div class="community-content">
+            <div class="community-search">
+                <input type="text" class="form-input" id="searchInput" placeholder="搜索项目、用户...">
+                <button class="btn-search" onclick="searchProjects()">搜索</button>
+            </div>
+
+            <!-- 项目列表 -->
+            <div class="community-grid" id="communityGrid">
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-state-icon">🔍</div>
+                    <div class="empty-state-text">加载中...</div>
+                </div>
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <div class="footer-bottom">
+                    <p>&copy; 2026 Autoconfig. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        let currentPage = 1;
+
+        // 动态导航状态
+        (async () => {
+            const user = await checkAuth();
+            const actions = document.getElementById('navActions');
+            if (user && actions) {
+                actions.innerHTML = `<a href="/dashboard" class="btn-register">控制台</a>`;
+            }
+        })();
+
+        // 加载统计
+        (async () => {
+            try {
+                const stats = await api('/api/community/stats');
+                document.getElementById('statUsers').textContent = stats.user_count;
+                document.getElementById('statPublic').textContent = stats.public_count;
+                document.getElementById('statAllVisits').textContent = stats.total_visits;
+            } catch { }
+        })();
+
+        // 加载项目
+        loadCommunity();
+
+        async function loadCommunity(page = 1) {
+            currentPage = page;
+            const search = document.getElementById('searchInput').value;
+            try {
+                const data = await api(`/api/community/projects?page=${page}&search=${encodeURIComponent(search)}`);
+                renderCommunity(data.projects, data.pagination);
+            } catch (err) {
+                document.getElementById('communityGrid').innerHTML = `
+                    <div class="empty-state" style="grid-column:1/-1">
+                        <div class="empty-state-icon">😕</div>
+                        <div class="empty-state-text">加载失败</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderCommunity(projects, pagination) {
+            const grid = document.getElementById('communityGrid');
+
+            if (projects.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column:1/-1">
+                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-text">暂无公开项目</div>
+                        <div class="empty-state-hint">去部署一个项目并设为公开吧！</div>
+                    </div>
+                `;
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            grid.innerHTML = projects.map(p => `
+                <div class="community-card">
+                    <div class="community-card-author">
+                        <div class="community-card-avatar">${p.username[0].toUpperCase()}</div>
+                        <span class="community-card-username">${escapeHtml(p.username)}</span>
+                    </div>
+                    <div class="community-card-name">${escapeHtml(p.name)}</div>
+                    <div class="community-card-desc">${escapeHtml(p.description || '暂无描述')}</div>
+                    <div class="community-card-footer">
+                        <div class="community-card-meta">
+                            <span>📄 ${p.file_count} 文件</span>
+                            <span>👀 ${p.visit_count} 访问</span>
+                        </div>
+                        <a href="/project/${p.username}/${p.slug}" class="community-card-link">查看详情 →</a>
+                    </div>
+                </div>
+            `).join('');
+
+            // 分页
+            if (pagination.pages > 1) {
+                let html = '';
+                for (let i = 1; i <= pagination.pages; i++) {
+                    html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="loadCommunity(${i})">${i}</button>`;
+                }
+                document.getElementById('pagination').innerHTML = html;
+            } else {
+                document.getElementById('pagination').innerHTML = '';
+            }
+        }
+
+        function searchProjects() {
+            loadCommunity(1);
+        }
+
+        document.getElementById('searchInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') searchProjects();
+        });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
