@@ -17,12 +17,12 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: '请填写所有必填字段' });
         }
 
-        if (username.length < 3 || username.length > 20) {
-            return res.status(400).json({ error: '用户名长度需在3-20个字符之间' });
+        if (username.length < 2 || username.length > 20) {
+            return res.status(400).json({ error: '用户名长度需在2-20个字符之间' });
         }
 
-        if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-            return res.status(400).json({ error: '用户名只能包含字母、数字、下划线和连字符' });
+        if (!/^[\u4e00-\u9fa5a-zA-Z0-9_-]+$/.test(username)) {
+            return res.status(400).json({ error: '用户名只能包含中文、字母、数字、下划线和连字符' });
         }
 
         if (password.length < 6) {
