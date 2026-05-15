@@ -11,23 +11,7 @@
 <body>
     <div class="content-page">
         <!-- 导航栏 -->
-        <nav class="navbar scrolled">
-            <div class="nav-container">
-                <a href="/" class="nav-logo">
-                    <span class="logo-icon">⚡</span>
-                    <span class="logo-text">Autoconfig</span>
-                </a>
-                <div class="nav-links">
-                    <a href="/about">关于我们</a>
-                    <a href="/docs" style="color:var(--text-primary)">使用文档</a>
-                    <a href="/community">社区广场</a>
-                    <a href="/privacy">隐私政策</a>
-                </div>
-                <div class="nav-actions" id="navActions">
-                    <a href="/login" class="btn-login">登录</a>
-                    <a href="/register" class="btn-register">免费注册</a>
-                </div>
-            </div>
+        <nav class="navbar scrolled" id="navbar">
         </nav>
 
         <div class="content-container">
@@ -116,11 +100,7 @@
     <script src="js/common.js"></script>
     <script>
         (async () => {
-            const user = await checkAuth();
-            const actions = document.getElementById('navActions');
-            if (user && actions) {
-                actions.innerHTML = `<a href="/dashboard" class="btn-register">控制台</a>`;
-            }
+            await initNavbar('/docs');
         })();
     </script>
 </body>

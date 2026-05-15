@@ -71,21 +71,7 @@
 </head>
 <body>
     <div class="store-page">
-        <nav class="navbar scrolled">
-            <div class="nav-container">
-                <a href="/" class="nav-logo"><span class="logo-icon">⚡</span><span class="logo-text">Autoconfig</span></a>
-                <div class="nav-links">
-                    <a href="/community">社区广场</a>
-                    <a href="/templates" style="color:var(--text-primary)">模板商城</a>
-                    <a href="/leaderboard">排行榜</a>
-                    <a href="/docs">使用文档</a>
-                    <a href="/chat" id="chatNavLink" style="position:relative;display:none">💬<span id="chatBadge" style="position:absolute;top:-6px;right:-10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:700;line-height:16px;text-align:center;display:none"></span></a>
-                </div>
-                <div class="nav-actions" id="navActions">
-                    <a href="/login" class="btn-login">登录</a>
-                    <a href="/register" class="btn-register">免费注册</a>
-                </div>
-            </div>
+        <nav class="navbar scrolled" id="navbar">
         </nav>
 
         <section class="store-hero">
@@ -143,23 +129,11 @@
         let purchasedIds = new Set();
 
         (async () => {
-            currentUser = await checkAuth();
-            const actions = document.getElementById('navActions');
+            currentUser = await initNavbar('/templates');
             if (currentUser) {
-                actions.innerHTML = `<a href="/dashboard" class="btn-register">控制台</a>`;
                 document.getElementById('coinBar').style.display = 'inline-flex';
                 loadCoins();
                 loadMyTemplates();
-                // Show chat icon with unread badge
-                document.getElementById('chatNavLink').style.display = '';
-                try {
-                    const ud = await api('/api/chat/unread');
-                    if (ud.unread > 0) {
-                        const badge = document.getElementById('chatBadge');
-                        badge.textContent = ud.unread > 99 ? '99+' : ud.unread;
-                        badge.style.display = '';
-                    }
-                } catch {}
             }
             loadTemplates();
         })();

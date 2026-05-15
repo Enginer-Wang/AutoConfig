@@ -13,6 +13,17 @@ const communityRoutes = require('./src/routes/community');
 const storeRoutes = require('./src/routes/store');
 const adminRoutes = require('./src/routes/admin');
 const chatRoutes = require('./src/routes/chat');
+const subjectRoutes = require('./src/routes/subjects');
+const exerciseRoutes = require('./src/routes/exercises');
+const classRoutes = require('./src/routes/classes');
+const homeworkRoutes = require('./src/routes/homework');
+const dashboardRoutes = require('./src/routes/dashboard');
+const collabRoutes = require('./src/routes/collab');
+const playbackRoutes = require('./src/routes/playback');
+const autogradeRoutes = require('./src/routes/autograde');
+const gamificationRoutes = require('./src/routes/gamification');
+const classAnalyticsRoutes = require('./src/routes/classAnalytics');
+const instantAssignmentRoutes = require('./src/routes/instantAssignment');
 const { authMiddleware, adminMiddleware } = require('./src/middleware/auth');
 
 const app = express();
@@ -38,6 +49,17 @@ app.use('/api/community', communityRoutes);
 app.use('/api/store', storeRoutes);
 app.use('/api/admin', adminMiddleware, adminRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/subjects', subjectRoutes);
+app.use('/api/exercises', exerciseRoutes);
+app.use('/api/classes', classRoutes);
+app.use('/api/homework', homeworkRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/collab', collabRoutes);
+app.use('/api/playback', playbackRoutes);
+app.use('/api/autograde', autogradeRoutes);
+app.use('/api/gamification', gamificationRoutes);
+app.use('/api/class-analytics', classAnalyticsRoutes);
+app.use('/api/instant', instantAssignmentRoutes);
 
 // 已部署站点的路由 - /site/username/project 路径访问
 app.use('/site', siteRoutes);
@@ -71,6 +93,14 @@ app.get('/about', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/about.html'));
 });
 
+app.get('/subjects', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/subjects.html'));
+});
+
+app.get('/stats', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/stats.html'));
+});
+
 app.get('/privacy', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/privacy.html'));
 });
@@ -99,6 +129,30 @@ app.get('/chat/:username', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/chat.html'));
 });
 
+app.get('/classes', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/classes.html'));
+});
+
+app.get('/homework', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/homework.html'));
+});
+
+app.get('/teacher-dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/teacher-dashboard.html'));
+});
+
+app.get('/grading-workspace', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/grading-workspace.html'));
+});
+
+app.get('/class-analytics', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/class-analytics.html'));
+});
+
+app.get('/instant-quiz', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/instant-quiz.html'));
+});
+
 app.get('/edit-project/:id', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/editor.html'));
 });
@@ -113,12 +167,20 @@ app.use((req, res) => {
     res.status(404).sendFile(path.join(__dirname, 'public/404.html'));
 });
 
-app.listen(PORT, () => {
+// 使用 http.createServer 以支持 WebSocket 升级
+const http = require('http');
+const { initWebSocket } = require('./src/websocket');
+const server = http.createServer(app);
+initWebSocket(server);
+
+server.listen(PORT, () => {
     console.log(`\n  ⚡  Autoconfig 全功能平台已启动`);
     console.log(`  ➜  Local:   http://localhost:${PORT}/`);
     console.log(`  ➜  控制台:  http://localhost:${PORT}/dashboard`);
     console.log(`  ➜  社区:    http://localhost:${PORT}/community`);
+    console.log(`  ➜  聊天室:  http://localhost:${PORT}/chat`);
     console.log(`  ➜  管理后台: http://localhost:${PORT}/admin`);
+    console.log(`  🔌 WebSocket: ws://localhost:${PORT}/ws`);
     console.log(`  👑  管理员:  admin / admin1234\n`);
 });
 

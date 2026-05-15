@@ -152,6 +152,8 @@
                             <select class="form-select" id="userRoleFilter" onchange="loadUsers()">
                                 <option value="all">全部角色</option>
                                 <option value="admin">管理员</option>
+                                <option value="teacher">教师</option>
+                                <option value="student">学生</option>
                                 <option value="user">普通用户</option>
                             </select>
                             <button class="btn btn-primary" onclick="showCreateUserModal()">+ 创建用户</button>
@@ -279,6 +281,8 @@
                         <label>角色</label>
                         <select class="form-input" id="editRole">
                             <option value="user">普通用户</option>
+                            <option value="student">学生</option>
+                            <option value="teacher">教师</option>
                             <option value="admin">管理员</option>
                         </select>
                     </div>

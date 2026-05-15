@@ -243,6 +243,12 @@
                         <span>点赞</span>
                         <span class="like-count" id="likeCount">0</span>
                     </button>
+                    <a id="downloadBtn" href="#" class="action-btn btn-visit-site" style="background:linear-gradient(135deg,#22c55e,#16a34a)">
+                        ⬇️ 下载源码
+                    </a>
+                    <button id="cloneBtn" class="action-btn btn-visit-site" style="background:linear-gradient(135deg,#f59e0b,#d97706);display:none" onclick="cloneProject()">
+                        ✏️ 复制并编辑
+                    </button>
                 </div>
 
                 <!-- 站点预览 -->
@@ -396,6 +402,12 @@
             // 访问链接
             const siteUrl = `/site/${username}/${slug}`;
             document.getElementById('visitSiteBtn').href = siteUrl;
+            document.getElementById('downloadBtn').href = `/api/community/download/${project.id}`;
+            // 复制并编辑：登录用户可复制公开项目（或自己的项目）
+            if (currentUser && (project.is_public || (currentUser.username === author.username))) {
+                document.getElementById('cloneBtn').style.display = '';
+                document.getElementById('cloneBtn').dataset.id = project.id;
+            }
 
             // 点赞
             document.getElementById('likeCount').textContent = likeCount;
@@ -485,6 +497,22 @@
             `).join('');
         }
 
+        // 复制并编辑项目
+        async function cloneProject() {
+            if (!currentUser) { showToast('请先登录', 'info'); window.location.href = '/login'; return; }
+            const btn = document.getElementById('cloneBtn');
+            const id = btn.dataset.id;
+            if (!id) return;
+            try {
+                btn.disabled = true; btn.textContent = '⏳ 复制中...';
+                const res = await api('/api/projects/' + id + '/clone', { method: 'POST' });
+                showToast('已复制到您的账号，正在跳转...', 'success');
+                setTimeout(() => { window.location.href = res.editUrl; }, 600);
+            } catch (err) {
+                showToast(err.message || '复制失败', 'error');
+                btn.disabled = false; btn.textContent = '✏️ 复制并编辑';
+            }
+        }
         // 点赞
         async function toggleLike() {
             if (!currentUser) {

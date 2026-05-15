@@ -11,11 +11,15 @@ const router = express.Router();
 // 注册
 router.post('/register', async (req, res) => {
     try {
-        const { username, email, password } = req.body;
+        const { username, email, password, role, school } = req.body;
 
         if (!username || !email || !password) {
             return res.status(400).json({ error: '请填写所有必填字段' });
         }
+
+        // 验证角色
+        const validRoles = ['teacher', 'student'];
+        const userRole = validRoles.includes(role) ? role : 'teacher';
 
         if (username.length < 2 || username.length > 20) {
             return res.status(400).json({ error: '用户名长度需在2-20个字符之间' });
@@ -40,8 +44,8 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const result = db.prepare(
-            'INSERT INTO users (username, email, password) VALUES (?, ?, ?)'
-        ).run(username, email, hashedPassword);
+            'INSERT INTO users (username, email, password, role, school) VALUES (?, ?, ?, ?, ?)'
+        ).run(username, email, hashedPassword, userRole, school || '');
 
         const user = { id: result.lastInsertRowid, username, email };
         const token = generateToken(user);
@@ -52,7 +56,7 @@ router.post('/register', async (req, res) => {
             sameSite: 'lax'
         });
 
-        res.json({ success: true, user: { id: user.id, username, email }, token });
+        res.json({ success: true, user: { id: user.id, username, email, role: userRole }, token });
     } catch (err) {
         console.error('注册失败:', err);
         res.status(500).json({ error: '注册失败，请稍后重试' });
@@ -111,7 +115,7 @@ router.post('/logout', (req, res) => {
 router.get('/me', authMiddleware, (req, res) => {
     const db = getDb();
     const user = db.prepare(
-        'SELECT id, username, email, avatar, bio, coins, role, created_at FROM users WHERE id = ?'
+        'SELECT id, username, email, avatar, bio, coins, role, school, created_at FROM users WHERE id = ?'
     ).get(req.user.id);
 
     if (!user) {

@@ -35,7 +35,15 @@ function authMiddleware(req, res, next) {
         return res.status(401).json({ error: '登录已过期，请重新登录' });
     }
 
-    req.user = decoded;
+    // 获取用户最新角色信息
+    const { getDb } = require('../database');
+    const db = getDb();
+    const user = db.prepare('SELECT id, username, email, role, coins FROM users WHERE id = ?').get(decoded.id);
+    if (!user) {
+        return res.status(401).json({ error: '用户不存在' });
+    }
+
+    req.user = user;
     next();
 }
 
@@ -43,7 +51,13 @@ function optionalAuth(req, res, next) {
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     if (token) {
         const decoded = verifyToken(token);
-        if (decoded) req.user = decoded;
+        if (decoded) {
+            const { getDb } = require('../database');
+            const db = getDb();
+            const user = db.prepare('SELECT id, username, email, role, coins FROM users WHERE id = ?').get(decoded.id);
+            if (user) req.user = user;
+            else req.user = decoded;
+        }
     }
     next();
 }
@@ -58,16 +72,15 @@ function adminMiddleware(req, res, next) {
     if (!decoded) {
         return res.status(401).json({ error: '登录已过期，请重新登录' });
     }
-    req.user = decoded;
 
-    // 检查是否为管理员
+    // 获取用户信息
     const { getDb } = require('../database');
     const db = getDb();
-    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(decoded.id);
+    const user = db.prepare('SELECT id, username, email, role, coins FROM users WHERE id = ?').get(decoded.id);
     if (!user || user.role !== 'admin') {
         return res.status(403).json({ error: '需要管理员权限' });
     }
-    req.user.role = 'admin';
+    req.user = user;
     next();
 }
 

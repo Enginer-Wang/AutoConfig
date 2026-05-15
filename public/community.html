@@ -12,25 +12,6 @@
     <div class="community-page">
         <!-- 导航栏 -->
         <nav class="navbar scrolled" id="navbar">
-            <div class="nav-container">
-                <a href="/" class="nav-logo">
-                    <span class="logo-icon">⚡</span>
-                    <span class="logo-text">Autoconfig</span>
-                </a>
-                <div class="nav-links" id="navLinks">
-                    <a href="/community" style="color:var(--text-primary)">社区广场</a>
-                    <a href="/templates">模板商城</a>
-                    <a href="/leaderboard">排行榜</a>
-                    <a href="/docs">使用文档</a>
-                </div>
-                <div class="nav-actions" id="navActions">
-                    <a href="/login" class="btn-login">登录</a>
-                    <a href="/register" class="btn-register">免费注册</a>
-                </div>
-                <button class="nav-toggle" id="navToggle" aria-label="切换导航">
-                    <span></span><span></span><span></span>
-                </button>
-            </div>
         </nav>
 
         <!-- Hero -->
@@ -86,13 +67,9 @@
     <script>
         let currentPage = 1;
 
-        // 动态导航状态
+        // 统一导航栏初始化
         (async () => {
-            const user = await checkAuth();
-            const actions = document.getElementById('navActions');
-            if (user && actions) {
-                actions.innerHTML = `<a href="/dashboard" class="btn-register">控制台</a>`;
-            }
+            await initNavbar('/community');
         })();
 
         // 加载统计
@@ -144,6 +121,7 @@
                     <div class="community-card-author">
                         <div class="community-card-avatar">${p.username[0].toUpperCase()}</div>
                         <span class="community-card-username">${escapeHtml(p.username)}</span>
+                        ${getRoleBadge(p.author_role || 'user')}
                     </div>
                     <div class="community-card-name">${escapeHtml(p.name)}</div>
                     <div class="community-card-desc">${escapeHtml(p.description || '暂无描述')}</div>

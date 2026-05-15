@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深度批改工作台 - Autoconfig</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; height: 100vh; overflow: hidden; }
+        
+        .workspace-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: #1a1f26; border-bottom: 1px solid #2d3640; height: 56px; }
+        .workspace-header h1 { font-size: 16px; font-weight: 600; }
+        .workspace-header .hw-info { font-size: 13px; color: #8b98a5; }
+        .workspace-header .actions { display: flex; gap: 8px; }
+        .workspace-header .actions button { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+        .btn-primary { background: #1d9bf0; color: #fff; }
+        .btn-primary:hover { background: #1a8cd8; }
+        .btn-danger { background: #f4212e; color: #fff; }
+        .btn-danger:hover { background: #dc1d29; }
+        .btn-secondary { background: #2d3640; color: #e7e9ea; }
+        .btn-secondary:hover { background: #3d4854; }
+
+        .workspace-body { display: flex; height: calc(100vh - 56px); }
+
+        /* 左栏：学生列表 */
+        .panel-left { width: 280px; border-right: 1px solid #2d3640; display: flex; flex-direction: column; background: #15191e; }
+        .panel-left .panel-header { padding: 12px 16px; border-bottom: 1px solid #2d3640; font-size: 13px; font-weight: 600; color: #8b98a5; display: flex; justify-content: space-between; align-items: center; }
+        .panel-left .stats-bar { display: flex; gap: 8px; font-size: 11px; }
+        .panel-left .stats-bar span { padding: 2px 6px; border-radius: 4px; }
+        .stat-submitted { background: #1d3a5c; color: #1d9bf0; }
+        .stat-graded { background: #1a3d2a; color: #00ba7c; }
+        .stat-rejected { background: #3d1f24; color: #f4212e; }
+        .student-list { flex: 1; overflow-y: auto; }
+        .student-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #1e252c; transition: background 0.15s; }
+        .student-item:hover { background: #1e252c; }
+        .student-item.active { background: #1d3a5c; border-left: 3px solid #1d9bf0; }
+        .student-item .avatar { width: 32px; height: 32px; border-radius: 50%; background: #2d3640; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .student-item .info { flex: 1; min-width: 0; }
+        .student-item .info .name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .student-item .info .meta { font-size: 11px; color: #8b98a5; margin-top: 2px; }
+        .student-item .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+        .badge-submitted { background: #1d3a5c; color: #1d9bf0; }
+        .badge-graded { background: #1a3d2a; color: #00ba7c; }
+        .badge-rejected { background: #3d1f24; color: #f4212e; }
+        .badge-not-submitted { background: #2d2d2d; color: #71767b; }
+
+        /* 中栏：预览/源码 */
+        .panel-center { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #2d3640; }
+        .panel-center .tab-bar { display: flex; border-bottom: 1px solid #2d3640; background: #1a1f26; }
+        .panel-center .tab-bar .tab { padding: 10px 20px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: #8b98a5; transition: all 0.15s; }
+        .panel-center .tab-bar .tab.active { color: #1d9bf0; border-bottom-color: #1d9bf0; }
+        .panel-center .tab-bar .tab:hover { color: #e7e9ea; }
+        .preview-frame { flex: 1; border: none; background: #fff; }
+        .code-viewer { flex: 1; overflow: auto; display: none; background: #0d1117; padding: 0; }
+        .code-viewer.active { display: block; }
+        .code-viewer pre { margin: 0; padding: 16px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.6; }
+        .code-line { display: flex; position: relative; }
+        .code-line:hover { background: rgba(29, 155, 240, 0.05); }
+        .code-line:hover .line-action { opacity: 1; }
+        .code-line .line-num { width: 50px; text-align: right; padding-right: 16px; color: #484f58; user-select: none; flex-shrink: 0; }
+        .code-line .line-content { flex: 1; white-space: pre-wrap; word-break: break-all; }
+        .code-line .line-action { position: absolute; left: 4px; opacity: 0; cursor: pointer; color: #1d9bf0; font-size: 14px; transition: opacity 0.15s; }
+        .code-line.has-annotation { background: rgba(244, 33, 46, 0.08); border-left: 3px solid #f4212e; }
+        .annotation-inline { margin: 4px 0 4px 50px; padding: 8px 12px; background: #1e252c; border-radius: 6px; border-left: 3px solid #f4212e; font-size: 12px; color: #e7e9ea; }
+        .annotation-inline .ann-header { display: flex; justify-content: space-between; margin-bottom: 4px; color: #8b98a5; font-size: 11px; }
+        .annotation-inline .severity-error { color: #f4212e; }
+        .annotation-inline .severity-warning { color: #ffb800; }
+        .annotation-inline .severity-info { color: #1d9bf0; }
+
+        .file-tabs { display: flex; gap: 0; background: #0d1117; border-bottom: 1px solid #2d3640; overflow-x: auto; }
+        .file-tab { padding: 8px 16px; font-size: 12px; cursor: pointer; color: #8b98a5; border-right: 1px solid #2d3640; white-space: nowrap; }
+        .file-tab.active { background: #1a1f26; color: #e7e9ea; }
+
+        /* 右栏：打分评语 */
+        .panel-right { width: 340px; display: flex; flex-direction: column; background: #15191e; }
+        .panel-right .panel-header { padding: 12px 16px; border-bottom: 1px solid #2d3640; font-size: 14px; font-weight: 600; }
+        .grading-form { flex: 1; overflow-y: auto; padding: 16px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 12px; color: #8b98a5; margin-bottom: 6px; font-weight: 500; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px 12px; background: #1e252c; border: 1px solid #2d3640; border-radius: 6px; color: #e7e9ea; font-size: 13px; outline: none; }
+        .form-group input:focus, .form-group textarea:focus { border-color: #1d9bf0; }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .score-input { display: flex; align-items: center; gap: 8px; }
+        .score-input input { width: 80px; text-align: center; font-size: 20px; font-weight: 700; }
+        .score-input .max-score { color: #8b98a5; font-size: 14px; }
+
+        .dimension-scores { margin-top: 12px; }
+        .dimension-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .dimension-item .dim-label { width: 80px; font-size: 12px; color: #8b98a5; text-align: right; }
+        .dimension-item input[type="range"] { flex: 1; accent-color: #1d9bf0; }
+        .dimension-item .dim-value { width: 36px; font-size: 12px; text-align: center; color: #1d9bf0; font-weight: 600; }
+
+        .grading-actions { padding: 16px; border-top: 1px solid #2d3640; display: flex; gap: 8px; flex-wrap: wrap; }
+        .grading-actions button { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+
+        /* 批注弹窗 */
+        .annotation-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e252c; border: 1px solid #2d3640; border-radius: 12px; padding: 20px; z-index: 1000; width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .annotation-modal.show { display: block; }
+        .annotation-modal h3 { font-size: 14px; margin-bottom: 12px; }
+        .annotation-modal select, .annotation-modal textarea { width: 100%; margin-bottom: 10px; padding: 8px; background: #0d1117; border: 1px solid #2d3640; border-radius: 6px; color: #e7e9ea; font-size: 13px; }
+        .annotation-modal textarea { min-height: 80px; }
+        .annotation-modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999; }
+        .overlay.show { display: block; }
+
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #8b98a5; font-size: 14px; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+    </style>
+</head>
+<body>
+    <div class="workspace-header">
+        <div>
+            <h1 id="hwTitle">深度批改工作台</h1>
+            <span class="hw-info" id="hwInfo">加载中...</span>
+        </div>
+        <div class="actions">
+            <button class="btn-secondary" onclick="location.href='/homework'">← 返回作业列表</button>
+            <button class="btn-primary" id="btnBatchGrade">批量快速打分</button>
+        </div>
+    </div>
+
+    <div class="workspace-body">
+        <!-- 左栏：学生列表 -->
+        <div class="panel-left">
+            <div class="panel-header">
+                <span>学生提交</span>
+                <div class="stats-bar">
+                    <span class="stat-submitted" id="statSubmitted">0</span>
+                    <span class="stat-graded" id="statGraded">0</span>
+                    <span class="stat-rejected" id="statRejected">0</span>
+                </div>
+            </div>
+            <div class="student-list" id="studentList"></div>
+        </div>
+
+        <!-- 中栏：预览/源码 -->
+        <div class="panel-center">
+            <div class="tab-bar">
+                <div class="tab active" data-tab="preview" onclick="switchTab('preview')">📄 动态预览</div>
+                <div class="tab" data-tab="code" onclick="switchTab('code')">💻 源码查看</div>
+            </div>
+            <div id="previewContainer" style="flex:1; display:flex; flex-direction:column;">
+                <iframe class="preview-frame" id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+            <div id="codeContainer" style="flex:1; display:none; flex-direction:column;">
+                <div class="file-tabs" id="fileTabs"></div>
+                <div class="code-viewer active" id="codeViewer">
+                    <pre id="codeContent"></pre>
+                </div>
+            </div>
+            <div class="empty-state" id="emptyCenter" style="display:flex;">
+                <div class="icon">📋</div>
+                <div>请从左侧选择一份学生提交</div>
+            </div>
+        </div>
+
+        <!-- 右栏：打分评语 -->
+        <div class="panel-right">
+            <div class="panel-header">评分与反馈</div>
+            <div class="grading-form" id="gradingForm">
+                <div class="form-group">
+                    <label>总分</label>
+                    <div class="score-input">
+                        <input type="number" id="scoreInput" min="0" value="0">
+                        <span class="max-score">/ <span id="maxScoreDisplay">100</span></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>多维度评分</label>
+                    <div class="dimension-scores" id="dimensionScores"></div>
+                </div>
+                <div class="form-group">
+                    <label>评语</label>
+                    <textarea id="feedbackInput" placeholder="输入批改评语..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>批注统计</label>
+                    <div id="annotationStats" style="font-size: 12px; color: #8b98a5;">暂无批注</div>
+                </div>
+            </div>
+            <div class="grading-actions">
+                <button class="btn-primary" onclick="submitGrade()">✓ 确认评分</button>
+                <button class="btn-danger" onclick="rejectSubmission()">↩ 打回重做</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批注弹窗 -->
+    <div class="overlay" id="overlay" onclick="closeAnnotationModal()"></div>
+    <div class="annotation-modal" id="annotationModal">
+        <h3>添加代码批注 <span id="annotationLine" style="color:#1d9bf0;"></span></h3>
+        <select id="annotationSeverity">
+            <option value="info">💡 提示 (Info)</option>
+            <option value="warning">⚠️ 警告 (Warning)</option>
+            <option value="error">❌ 错误 (Error)</option>
+        </select>
+        <textarea id="annotationContent" placeholder="输入批注内容..."></textarea>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeAnnotationModal()">取消</button>
+            <button class="btn-primary" onclick="saveAnnotation()">保存批注</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/homework';
+        let currentHomeworkId = null;
+        let currentSubmissionId = null;
+        let currentFiles = [];
+        let currentAnnotations = [];
+        let homeworkData = null;
+        let pendingAnnotationLine = null;
+
+        // 从 URL 获取作业 ID
+        const params = new URLSearchParams(location.search);
+        currentHomeworkId = parseInt(params.get('id'));
+
+        if (!currentHomeworkId) {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f4212e;">缺少作业ID参数</div>';
+        } else {
+            loadWorkspace();
+        }
+
+        async function apiCall(url, options = {}) {
+            const token = localStorage.getItem('token') || document.cookie.match(/token=([^;]+)/)?.[1];
+            const res = await fetch(url, {
+                ...options,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...options.headers }
+            });
+            return res.json();
+        }
+
+        async function loadWorkspace(submissionId) {
+            const url = `${API_BASE}/${currentHomeworkId}/grading-workspace` + (submissionId ? `?submissionId=${submissionId}` : '');
+            const data = await apiCall(url);
+            homeworkData = data;
+
+            // 更新标题
+            document.getElementById('hwTitle').textContent = `批改：${data.homework.title}`;
+            document.getElementById('hwInfo').textContent = `${data.homework.class_name} · 截止 ${data.homework.due_date || '无限期'}`;
+            document.getElementById('maxScoreDisplay').textContent = data.homework.max_score;
+            document.getElementById('scoreInput').max = data.homework.max_score;
+
+            // 更新统计
+            document.getElementById('statSubmitted').textContent = data.stats.submitted;
+            document.getElementById('statGraded').textContent = data.stats.graded;
+            document.getElementById('statRejected').textContent = data.stats.rejected;
+
+            // 渲染学生列表
+            renderStudentList(data.submissions, data.notSubmitted);
+
+            // 渲染维度评分
+            renderDimensions(data.gradingDimensions);
+
+            // 如果有当前提交，加载中栏
+            if (submissionId && data.currentSubmission) {
+                loadSubmissionContent(data.currentSubmission, data.annotations);
+            }
+        }
+
+        function renderStudentList(submissions, notSubmitted) {
+            const list = document.getElementById('studentList');
+            let html = '';
+
+            for (const s of submissions) {
+                const badgeClass = s.status === 'graded' ? 'badge-graded' : s.status === 'rejected' ? 'badge-rejected' : 'badge-submitted';
+                const statusText = s.status === 'graded' ? `${s.score}分` : s.status === 'rejected' ? '已打回' : '待批改';
+                const isActive = s.id === currentSubmissionId ? 'active' : '';
+                html += `
+                    <div class="student-item ${isActive}" onclick="selectSubmission(${s.id})">
+                        <div class="avatar">${(s.student_name || '?')[0]}</div>
+                        <div class="info">
+                            <div class="name">${s.student_name}</div>
+                            <div class="meta">第${s.submit_count || 1}次提交 · ${formatTime(s.submitted_at)}</div>
+                        </div>
+                        <span class="status-badge ${badgeClass}">${statusText}</span>
+                    </div>`;
+            }
+
+            for (const s of notSubmitted) {
+                html += `
+                    <div class="student-item" style="opacity: 0.5;">
+                        <div class="avatar">${(s.username || '?')[0]}</div>
+                        <div class="info">
+                            <div class="name">${s.username}</div>
+                            <div class="meta">未提交</div>
+                        </div>
+                        <span class="status-badge badge-not-submitted">未交</span>
+                    </div>`;
+            }
+
+            list.innerHTML = html;
+        }
+
+        async function selectSubmission(submissionId) {
+            currentSubmissionId = submissionId;
+            document.getElementById('emptyCenter').style.display = 'none';
+            document.getElementById('previewContainer').style.display = 'flex';
+            await loadWorkspace(submissionId);
+        }
+
+        async function loadSubmissionContent(submission, annotations) {
+            currentAnnotations = annotations || [];
+
+            // 加载文件列表
+            const filesData = await apiCall(`${API_BASE}/submission/${submission.id}/files`);
+            currentFiles = filesData.files || [];
+
+            // 如果有站点 URL，在 iframe 中预览
+            if (filesData.siteUrl) {
+                document.getElementById('previewFrame').src = filesData.siteUrl;
+            } else if (submission.content) {
+                const blob = new Blob([submission.content], { type: 'text/html' });
+                document.getElementById('previewFrame').src = URL.createObjectURL(blob);
+            }
+
+            // 渲染文件标签
+            renderFileTabs(currentFiles);
+
+            // 加载第一个文件的源码
+            if (currentFiles.length > 0) {
+                loadFileContent(currentFiles[0].path);
+            }
+
+            // 填入已有评分
+            document.getElementById('scoreInput').value = submission.score || 0;
+            document.getElementById('feedbackInput').value = submission.feedback || '';
+
+            // 更新批注统计
+            updateAnnotationStats();
+
+            // 恢复维度分
+            if (homeworkData.dimensionScores && homeworkData.dimensionScores.length > 0) {
+                for (const ds of homeworkData.dimensionScores) {
+                    const slider = document.querySelector(`[data-dimension="${ds.dimension}"]`);
+                    if (slider) {
+                        slider.value = ds.score;
+                        slider.nextElementSibling.textContent = ds.score;
+                    }
+                }
+            }
+        }
+
+        function renderFileTabs(files) {
+            const tabs = document.getElementById('fileTabs');
+            tabs.innerHTML = files.map((f, i) =>
+                `<div class="file-tab ${i === 0 ? 'active' : ''}" onclick="loadFileContent('${f.path}')" data-path="${f.path}">${f.name}</div>`
+            ).join('');
+        }
+
+        async function loadFileContent(filePath) {
+            const data = await apiCall(`${API_BASE}/submission/${currentSubmissionId}/file-content?filePath=${encodeURIComponent(filePath)}`);
+            
+            // 更新 active tab
+            document.querySelectorAll('.file-tab').forEach(t => t.classList.toggle('active', t.dataset.path === filePath));
+
+            // 渲染代码（带行号和批注按钮）
+            const lines = (data.content || '').split('\n');
+            const codeHtml = lines.map((line, i) => {
+                const lineNum = i + 1;
+                const hasAnn = currentAnnotations.some(a => a.line_start <= lineNum && (a.line_end || a.line_start) >= lineNum);
+                const annClass = hasAnn ? 'has-annotation' : '';
+                let html = `<div class="code-line ${annClass}" data-line="${lineNum}">
+                    <span class="line-action" onclick="openAnnotation(${lineNum})">+</span>
+                    <span class="line-num">${lineNum}</span>
+                    <span class="line-content">${escapeHtml(line)}</span>
+                </div>`;
+
+                // 插入该行的批注
+                const lineAnns = currentAnnotations.filter(a => a.line_start === lineNum);
+                for (const ann of lineAnns) {
+                    html += `<div class="annotation-inline">
+                        <div class="ann-header">
+                            <span class="severity-${ann.severity}">${ann.severity === 'error' ? '❌' : ann.severity === 'warning' ? '⚠️' : '💡'} ${ann.teacher_name}</span>
+                            <span>L${ann.line_start}${ann.line_end && ann.line_end !== ann.line_start ? '-' + ann.line_end : ''}</span>
+                        </div>
+                        <div>${escapeHtml(ann.content)}</div>
+                    </div>`;
+                }
+                return html;
+            }).join('');
+
+            document.getElementById('codeContent').innerHTML = codeHtml;
+        }
+
+        function renderDimensions(dimensions) {
+            if (!dimensions || dimensions.length === 0) {
+                // 默认维度
+                dimensions = [
+                    { name: '界面美观', key: 'ui_design' },
+                    { name: '逻辑设计', key: 'logic_design' },
+                    { name: '代码规范', key: 'code_quality' },
+                    { name: '交付时效', key: 'delivery_speed' },
+                    { name: '创新性', key: 'creativity' }
+                ];
+            }
+
+            const container = document.getElementById('dimensionScores');
+            container.innerHTML = dimensions.map(d => `
+                <div class="dimension-item">
+                    <span class="dim-label">${d.name || d.dimension || d.key}</span>
+                    <input type="range" min="0" max="100" value="50" data-dimension="${d.key || d.name}" 
+                        oninput="this.nextElementSibling.textContent=this.value">
+                    <span class="dim-value">50</span>
+                </div>
+            `).join('');
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            document.getElementById('previewContainer').style.display = tab === 'preview' ? 'flex' : 'none';
+            document.getElementById('codeContainer').style.display = tab === 'code' ? 'flex' : 'none';
+        }
+
+        function openAnnotation(lineNum) {
+            pendingAnnotationLine = lineNum;
+            document.getElementById('annotationLine').textContent = `第 ${lineNum} 行`;
+            document.getElementById('annotationContent').value = '';
+            document.getElementById('annotationModal').classList.add('show');
+            document.getElementById('overlay').classList.add('show');
+        }
+
+        function closeAnnotationModal() {
+            document.getElementById('annotationModal').classList.remove('show');
+            document.getElementById('overlay').classList.remove('show');
+        }
+
+        async function saveAnnotation() {
+            const content = document.getElementById('annotationContent').value.trim();
+            const severity = document.getElementById('annotationSeverity').value;
+            if (!content) return alert('请输入批注内容');
+
+            await apiCall(`${API_BASE}/${currentSubmissionId}/annotations`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    annotations: [{ lineStart: pendingAnnotationLine, content, severity, fileType: 'html' }]
+                })
+            });
+
+            closeAnnotationModal();
+            // 重新加载
+            await selectSubmission(currentSubmissionId);
+        }
+
+        async function submitGrade() {
+            if (!currentSubmissionId) return alert('请先选择一份提交');
+            const score = parseInt(document.getElementById('scoreInput').value) || 0;
+            const feedback = document.getElementById('feedbackInput').value.trim();
+
+            // 收集维度评分
+            const dimensionScores = [];
+            document.querySelectorAll('.dimension-item input[type="range"]').forEach(slider => {
+                dimensionScores.push({
+                    dimension: slider.dataset.dimension,
+                    score: parseInt(slider.value),
+                    maxScore: 100
+                });
+            });
+
+            await apiCall(`${API_BASE}/${currentSubmissionId}/grade`, {
+                method: 'POST',
+                body: JSON.stringify({ score, feedback, dimensionScores })
+            });
+
+            // 刷新列表，自动跳到下一个待批改
+            await loadWorkspace();
+            const nextSubmitted = homeworkData.submissions.find(s => s.status === 'submitted');
+            if (nextSubmitted) {
+                selectSubmission(nextSubmitted.id);
+            }
+        }
+
+        async function rejectSubmission() {
+            if (!currentSubmissionId) return alert('请先选择一份提交');
+            const reason = prompt('请输入打回原因：');
+            if (!reason) return;
+
+            await apiCall(`${API_BASE}/${currentSubmissionId}/reject`, {
+                method: 'POST',
+                body: JSON.stringify({ reason })
+            });
+
+            await loadWorkspace();
+        }
+
+        function updateAnnotationStats() {
+            const stats = document.getElementById('annotationStats');
+            if (currentAnnotations.length === 0) {
+                stats.textContent = '暂无批注';
+            } else {
+                const errors = currentAnnotations.filter(a => a.severity === 'error').length;
+                const warnings = currentAnnotations.filter(a => a.severity === 'warning').length;
+                const infos = currentAnnotations.filter(a => a.severity === 'info').length;
+                stats.innerHTML = `共 ${currentAnnotations.length} 条批注：<span style="color:#f4212e">${errors} 错误</span> · <span style="color:#ffb800">${warnings} 警告</span> · <span style="color:#1d9bf0">${infos} 提示</span>`;
+            }
+        }
+
+        function formatTime(t) {
+            if (!t) return '';
+            const d = new Date(t);
+            return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

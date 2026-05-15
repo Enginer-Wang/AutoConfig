@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学科课件 - Autoconfig 教师网页课件共享平台</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <style>
+        .subjects-page { padding: 100px 20px 60px; max-width: 1200px; margin: 0 auto; }
+        .page-header { text-align: center; margin-bottom: 48px; }
+        .page-header h1 { font-size: 2.2rem; background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; }
+        .page-header p { color: #94a3b8; font-size: 1.1rem; }
+
+        /* 学段切换 */
+        .level-tabs { display: flex; justify-content: center; gap: 16px; margin-bottom: 40px; }
+        .level-tab { padding: 12px 32px; border-radius: 12px; background: rgba(99,102,241,.08); color: #94a3b8; border: 2px solid transparent; cursor: pointer; font-size: 1.05rem; font-weight: 600; transition: all .3s; }
+        .level-tab:hover { background: rgba(99,102,241,.15); color: #c7d2fe; }
+        .level-tab.active { background: rgba(99,102,241,.2); color: #818cf8; border-color: #6366f1; }
+        .level-tab .count { font-size: .8rem; color: #64748b; margin-left: 6px; }
+
+        /* 学科网格 */
+        .subjects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 48px; }
+        .subject-card { background: rgba(30,30,60,.6); border: 1px solid rgba(99,102,241,.15); border-radius: 16px; padding: 24px; text-align: center; cursor: pointer; transition: all .3s; }
+        .subject-card:hover { transform: translateY(-4px); border-color: #6366f1; background: rgba(99,102,241,.1); }
+        .subject-card.active { border-color: #818cf8; background: rgba(99,102,241,.15); }
+        .subject-icon { font-size: 2.4rem; margin-bottom: 12px; }
+        .subject-name { font-size: 1.1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 6px; }
+        .subject-count { font-size: .85rem; color: #64748b; }
+
+        /* 课件列表 */
+        .courseware-section { margin-top: 32px; }
+        .courseware-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .courseware-header h2 { font-size: 1.4rem; color: #e2e8f0; }
+        .courseware-header .sort-info { color: #64748b; font-size: .9rem; }
+        .courseware-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .courseware-card { background: rgba(30,30,60,.6); border: 1px solid rgba(99,102,241,.12); border-radius: 16px; overflow: hidden; transition: all .3s; }
+        .courseware-card:hover { transform: translateY(-4px); border-color: rgba(99,102,241,.4); box-shadow: 0 8px 32px rgba(99,102,241,.1); }
+        .courseware-preview { height: 160px; background: linear-gradient(135deg, #1e1b4b, #312e81); display: flex; align-items: center; justify-content: center; font-size: 3rem; position: relative; overflow: hidden; }
+        .courseware-preview iframe { width: 100%; height: 100%; border: none; pointer-events: none; }
+        .courseware-info { padding: 16px; }
+        .courseware-title { font-size: 1.05rem; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .courseware-desc { color: #94a3b8; font-size: .85rem; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.4em; }
+        .courseware-meta { display: flex; justify-content: space-between; align-items: center; font-size: .8rem; color: #64748b; }
+        .courseware-author { display: flex; align-items: center; gap: 6px; }
+        .courseware-author img { width: 20px; height: 20px; border-radius: 50%; }
+        .courseware-stats { display: flex; gap: 12px; }
+        .courseware-stats span { display: flex; align-items: center; gap: 4px; }
+        .courseware-tag { display: inline-block; padding: 2px 8px; background: rgba(99,102,241,.15); color: #818cf8; border-radius: 6px; font-size: .75rem; margin-bottom: 8px; }
+
+        /* 空状态 */
+        .empty-state { text-align: center; padding: 80px 20px; color: #64748b; }
+        .empty-state .icon { font-size: 4rem; margin-bottom: 16px; }
+        .empty-state h3 { font-size: 1.3rem; color: #94a3b8; margin-bottom: 8px; }
+
+        /* 分页 */
+        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 40px; }
+        .pagination button { padding: 8px 16px; border-radius: 8px; background: rgba(99,102,241,.08); color: #94a3b8; border: 1px solid rgba(99,102,241,.15); cursor: pointer; transition: all .2s; }
+        .pagination button:hover { background: rgba(99,102,241,.2); color: #e2e8f0; }
+        .pagination button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+        .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+
+        /* 搜索框 */
+        .search-bar { display: flex; gap: 12px; margin-bottom: 32px; justify-content: center; }
+        .search-bar input { padding: 10px 20px; border-radius: 10px; border: 1px solid rgba(99,102,241,.2); background: rgba(15,15,35,.8); color: #e2e8f0; font-size: .95rem; width: 100%; max-width: 400px; outline: none; }
+        .search-bar input:focus { border-color: #6366f1; }
+        .search-bar button { padding: 10px 24px; border-radius: 10px; background: #6366f1; color: #fff; border: none; cursor: pointer; font-size: .95rem; }
+
+        /* 学科横向导航栏（粘性） */
+        .subject-subnav { position: sticky; top: 64px; z-index: 50; background: rgba(15,15,35,.92); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(99,102,241,.12); margin: -20px -20px 28px; padding: 12px 20px; }
+        .subject-subnav-inner { max-width: 1200px; margin: 0 auto; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; }
+        .subject-subnav-inner::-webkit-scrollbar { height: 4px; }
+        .subject-subnav-inner::-webkit-scrollbar-thumb { background: rgba(99,102,241,.4); border-radius: 2px; }
+        .subnav-item { display: flex; align-items: center; gap: 6px; padding: 6px 14px; background: rgba(99,102,241,.06); color: #94a3b8; border-radius: 999px; font-size: .85rem; cursor: pointer; white-space: nowrap; transition: all .2s; border: 1px solid transparent; }
+        .subnav-item:hover { background: rgba(99,102,241,.15); color: #e2e8f0; }
+        .subnav-item.active { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border-color: #818cf8; }
+        .subnav-item .num { background: rgba(255,255,255,.2); padding: 1px 6px; border-radius: 999px; font-size: .7rem; font-weight: 600; }
+
+        /* 课件卡片操作按钮 */
+        .courseware-card { display: flex; flex-direction: column; }
+        .courseware-info { flex: 1; display: flex; flex-direction: column; }
+        .courseware-actions { display: flex; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(99,102,241,.1); }
+        .ca-btn { flex: 1; padding: 6px 8px; border-radius: 6px; font-size: .78rem; cursor: pointer; border: 1px solid transparent; text-align: center; text-decoration: none; transition: all .2s; font-family: inherit; }
+        .ca-view { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; }
+        .ca-view:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,.3); }
+        .ca-download { background: rgba(34,197,94,.1); color: #86efac; border-color: rgba(34,197,94,.25); }
+        .ca-download:hover { background: rgba(34,197,94,.2); }
+        .ca-edit { background: rgba(245,158,11,.1); color: #fcd34d; border-color: rgba(245,158,11,.25); }
+        .ca-edit:hover { background: rgba(245,158,11,.2); }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar" id="navbar">
+    </nav>
+
+    <div class="subjects-page">
+        <div class="page-header">
+            <h1>📖 学科网页课件</h1>
+            <p>按学段、学科浏览老师们共享的优秀网页课件，按访问量排列</p>
+        </div>
+
+        <!-- 搜索 -->
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="搜索课件名称、描述或作者...">
+            <button onclick="doSearch()">🔍 搜索</button>
+        </div>
+
+        <!-- 学段切换 -->
+        <div class="level-tabs" id="levelTabs">
+            <div class="level-tab active" data-level="elementary" onclick="switchLevel('elementary')">
+                🏫 小学 <span class="count" id="count-elementary"></span>
+            </div>
+            <div class="level-tab" data-level="middle" onclick="switchLevel('middle')">
+                🏫 初中 <span class="count" id="count-middle"></span>
+            </div>
+            <div class="level-tab" data-level="high" onclick="switchLevel('high')">
+                🏫 高中 <span class="count" id="count-high"></span>
+            </div>
+        </div>
+
+        <!-- 学科横向导航条 -->
+        <div class="subject-subnav">
+            <div class="subject-subnav-inner" id="subjectSubnav"></div>
+        </div>
+
+        <!-- 学科网格 -->
+        <div class="subjects-grid" id="subjectsGrid"></div>
+
+        <!-- 课件列表 -->
+        <div class="courseware-section" id="coursewareSection" style="display:none;">
+            <div class="courseware-header">
+                <h2 id="coursewareTitle">课件列表</h2>
+                <span class="sort-info">📊 按访问量排序</span>
+            </div>
+            <div class="courseware-grid" id="coursewareGrid"></div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+
+        <!-- 空状态 -->
+        <div class="empty-state" id="emptyState" style="display:none;">
+            <div class="icon">📭</div>
+            <h3>暂无课件</h3>
+            <p>该学科暂时还没有老师共享课件，赶快成为第一个吧！</p>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        const SUBJECT_ICONS = {
+            '语文': '📖', '数学': '🔢', '英语': '🔤', '科学': '🔬',
+            '物理': '⚛️', '化学': '🧪', '道德与法治': '⚖️',
+            '历史': '📜', '地理': '🌍', '生物': '🧬',
+            '政治': '🏛️', '信息技术': '💻', '通用技术': '🔧',
+            '音乐': '🎵', '美术': '🎨', '体育': '⚽'
+        };
+        const LEVEL_NAMES = { elementary: '小学', middle: '初中', high: '高中' };
+
+        let currentLevel = 'elementary';
+        let currentSubject = '';
+        let currentPage = 1;
+        let currentUser = null;
+        let structureData = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            currentUser = await initNavbar('/subjects');
+            await loadStructure();
+            // 检查URL参数
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('level') && ['elementary','middle','high'].includes(params.get('level'))) {
+                currentLevel = params.get('level');
+                switchLevel(currentLevel);
+            }
+            if (params.get('subject')) {
+                currentSubject = params.get('subject');
+            }
+            renderSubnav();
+            loadCourseware();
+        });
+
+        async function updateNavForAuth() {
+            // Handled by initNavbar
+        }
+
+        async function loadStructure() {
+            try {
+                const data = await api('/api/subjects/structure');
+                structureData = data.levels;
+                renderSubjects();
+                renderSubnav();
+                updateLevelCounts();
+            } catch (err) {
+                console.error('加载学科结构失败:', err);
+            }
+        }
+
+        function updateLevelCounts() {
+            if (!structureData) return;
+            for (const [key, level] of Object.entries(structureData)) {
+                const total = level.subjects.reduce((sum, s) => sum + s.count, 0);
+                const el = document.getElementById(`count-${key}`);
+                if (el) el.textContent = `(${total})`;
+            }
+        }
+
+        function switchLevel(level) {
+            currentLevel = level;
+            currentSubject = '';
+            document.querySelectorAll('.level-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-level="${level}"]`).classList.add('active');
+            renderSubjects();
+            renderSubnav();
+            document.getElementById('coursewareSection').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+            // 更新URL
+            const url = new URL(window.location);
+            url.searchParams.set('level', level);
+            url.searchParams.delete('subject');
+            window.history.replaceState({}, '', url);
+        }
+
+        function renderSubnav() {
+            const bar = document.getElementById('subjectSubnav');
+            const levelData = structureData?.[currentLevel];
+            if (!levelData) { bar.innerHTML = ''; return; }
+            const items = [`<div class="subnav-item ${currentSubject === '' ? 'active' : ''}" onclick="selectSubject('')">📚 全部</div>`];
+            levelData.subjects.forEach(s => {
+                items.push(`<div class="subnav-item ${currentSubject === s.name ? 'active' : ''}" onclick="selectSubject('${s.name}')">${SUBJECT_ICONS[s.name] || '📄'} ${s.name}<span class="num">${s.count}</span></div>`);
+            });
+            bar.innerHTML = items.join('');
+        }
+
+        function renderSubjects() {
+            const grid = document.getElementById('subjectsGrid');
+            const levelData = structureData?.[currentLevel];
+            if (!levelData) { grid.innerHTML = ''; return; }
+
+            grid.innerHTML = levelData.subjects.map(subj => `
+                <div class="subject-card ${currentSubject === subj.name ? 'active' : ''}" 
+                     onclick="selectSubject('${subj.name}')">
+                    <div class="subject-icon">${SUBJECT_ICONS[subj.name] || '📄'}</div>
+                    <div class="subject-name">${subj.name}</div>
+                    <div class="subject-count">${subj.count} 个课件</div>
+                </div>
+            `).join('');
+        }
+
+        function selectSubject(subject) {
+            currentSubject = subject;
+            currentPage = 1;
+            renderSubjects();
+            renderSubnav();
+            loadCourseware();
+            const url = new URL(window.location);
+            url.searchParams.set('level', currentLevel);
+            if (subject) url.searchParams.set('subject', subject);
+            else url.searchParams.delete('subject');
+            window.history.replaceState({}, '', url);
+        }
+
+        async function loadCourseware() {
+            const section = document.getElementById('coursewareSection');
+            const empty = document.getElementById('emptyState');
+            const search = document.getElementById('searchInput').value.trim();
+
+            const params = new URLSearchParams({
+                level: currentLevel,
+                page: currentPage,
+                limit: 12
+            });
+            if (currentSubject) params.set('subject', currentSubject);
+            if (search) params.set('search', search);
+
+            try {
+                const data = await api(`/api/subjects/list?${params}`);
+                
+                document.getElementById('coursewareTitle').textContent = currentSubject
+                    ? `${SUBJECT_ICONS[currentSubject] || '📄'} ${LEVEL_NAMES[currentLevel]} · ${currentSubject}`
+                    : `📚 ${LEVEL_NAMES[currentLevel]} · 全部课件`;
+
+                if (data.projects.length === 0) {
+                    section.style.display = 'none';
+                    empty.style.display = 'block';
+                    return;
+                }
+
+                section.style.display = 'block';
+                empty.style.display = 'none';
+                renderCoursewareGrid(data.projects);
+                renderPagination(data.pagination);
+            } catch (err) {
+                console.error('加载课件失败:', err);
+            }
+        }
+
+        function renderCoursewareGrid(projects) {
+            const grid = document.getElementById('coursewareGrid');
+            grid.innerHTML = projects.map(p => {
+                const levelLbl = LEVEL_NAMES[p.school_level] || p.school_level || '';
+                const editBtn = currentUser
+                    ? `<button class="ca-btn ca-edit" onclick="event.stopPropagation();cloneAndEdit(${p.id})" title="复制到我的项目并编辑">✏️ 编辑</button>`
+                    : `<a class="ca-btn ca-edit" href="/login" onclick="event.stopPropagation()" title="登录后可编辑">✏️ 编辑</a>`;
+                return `
+                <div class="courseware-card" onclick="window.open('/site/${p.username}/${p.slug}', '_blank')">
+                    <div class="courseware-preview">
+                        <iframe src="/site/${p.username}/${p.slug}" loading="lazy" sandbox="allow-scripts"></iframe>
+                    </div>
+                    <div class="courseware-info">
+                        <div class="courseware-tag">${levelLbl} · ${p.subject || '未分类'}</div>
+                        <div class="courseware-title">${escapeHtml(p.name)}</div>
+                        <div class="courseware-desc">${escapeHtml(p.description || '暂无描述')}</div>
+                        <div class="courseware-meta">
+                            <div class="courseware-author">
+                                <span>👤</span>
+                                <span>${escapeHtml(p.username)}</span>
+                            </div>
+                            <div class="courseware-stats">
+                                <span>👁 ${p.visit_count || 0}</span>
+                                <span>❤️ ${p.like_count || 0}</span>
+                            </div>
+                        </div>
+                        <div class="courseware-actions">
+                            <a class="ca-btn ca-view" href="/site/${p.username}/${p.slug}" target="_blank" onclick="event.stopPropagation()">▶ 查看</a>
+                            <a class="ca-btn ca-download" href="/api/community/download/${p.id}" onclick="event.stopPropagation()" title="下载源码 ZIP">⬇️ 下载</a>
+                            ${editBtn}
+                        </div>
+                    </div>
+                </div>
+            `;}).join('');
+        }
+
+        async function cloneAndEdit(id) {
+            try {
+                showToast('正在复制项目...', 'info');
+                const res = await api('/api/projects/' + id + '/clone', { method: 'POST' });
+                showToast('已复制到您的账号，跳转到编辑器', 'success');
+                setTimeout(() => { window.location.href = res.editUrl; }, 600);
+            } catch (err) {
+                showToast(err.message || '复制失败', 'error');
+            }
+        }
+
+        function renderPagination(pagination) {
+            const div = document.getElementById('pagination');
+            if (pagination.pages <= 1) { div.innerHTML = ''; return; }
+
+            let html = '';
+            html += `<button ${pagination.page <= 1 ? 'disabled' : ''} onclick="goPage(${pagination.page - 1})">上一页</button>`;
+            for (let i = 1; i <= pagination.pages; i++) {
+                if (i > 5 && i < pagination.pages - 1 && Math.abs(i - pagination.page) > 2) {
+                    if (i === 6) html += `<button disabled>...</button>`;
+                    continue;
+                }
+                html += `<button class="${i === pagination.page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+            }
+            html += `<button ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="goPage(${pagination.page + 1})">下一页</button>`;
+            div.innerHTML = html;
+        }
+
+        function goPage(page) {
+            currentPage = page;
+            loadCourseware();
+            window.scrollTo({ top: document.getElementById('coursewareSection').offsetTop - 100, behavior: 'smooth' });
+        }
+
+        function doSearch() {
+            currentPage = 1;
+            if (currentSubject) {
+                loadCourseware();
+            }
+        }
+
+        document.getElementById('searchInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doSearch();
+        });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -17,7 +17,7 @@ router.get('/projects', (req, res) => {
     const db = getDb();
 
     let query = `
-        SELECT p.*, u.username, u.avatar
+        SELECT p.*, u.username, u.avatar, u.role as author_role
         FROM projects p
         JOIN users u ON p.user_id = u.id
         WHERE p.is_public = 1
@@ -191,6 +191,45 @@ router.delete('/comment/:id', authMiddleware, (req, res) => {
 
     db.prepare('DELETE FROM comments WHERE id = ?').run(req.params.id);
     res.json({ success: true });
+});
+
+// 公开下载：任何人均可下载已公开的课件 ZIP
+const path = require('path');
+const fs = require('fs');
+const AdmZip = require('adm-zip');
+const SITES_DIR = path.join(__dirname, '..', '..', 'data', 'sites');
+
+router.get('/download/:id', optionalAuth, (req, res) => {
+    const db = getDb();
+    const project = db.prepare(
+        'SELECT p.*, u.username FROM projects p JOIN users u ON p.user_id = u.id WHERE p.id = ?'
+    ).get(req.params.id);
+    if (!project) return res.status(404).json({ error: '项目不存在' });
+
+    // 仅公开项目可被任何人下载；私有需作者或管理员
+    if (!project.is_public) {
+        if (!req.user) return res.status(403).json({ error: '该项目未公开' });
+        const cu = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.id);
+        const isOwner = project.user_id === req.user.id;
+        const isAdmin = cu && cu.role === 'admin';
+        if (!isOwner && !isAdmin) return res.status(403).json({ error: '该项目未公开' });
+    }
+
+    const siteDir = path.join(SITES_DIR, project.username, project.slug);
+    if (!fs.existsSync(siteDir)) return res.status(404).json({ error: '项目文件不存在' });
+
+    try {
+        const zip = new AdmZip();
+        zip.addLocalFolder(siteDir);
+        const buffer = zip.toBuffer();
+        const fileName = `${project.slug}.zip`;
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+        res.send(buffer);
+    } catch (err) {
+        console.error('打包下载失败:', err);
+        res.status(500).json({ error: '打包失败: ' + err.message });
+    }
 });
 
 module.exports = router;

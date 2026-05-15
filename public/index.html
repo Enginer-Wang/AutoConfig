@@ -6,32 +6,11 @@
     <title>Autoconfig - 极速托管你的个人网页与项目</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/app.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 </head>
 <body>
     <!-- 导航栏 -->
     <nav class="navbar" id="navbar">
-        <div class="nav-container">
-            <a href="/" class="nav-logo">
-                <span class="logo-icon">⚡</span>
-                <span class="logo-text">Autoconfig</span>
-            </a>
-            <div class="nav-links" id="navLinks">
-                <a href="/community">社区广场</a>
-                <a href="/templates">模板商城</a>
-                <a href="/leaderboard">排行榜</a>
-                <a href="/docs">使用文档</a>
-            </div>
-            <div class="nav-actions" id="navActions">
-                <a href="/login" class="btn-login">登录</a>
-                <a href="/register" class="btn-register">免费注册</a>
-            </div>
-            <button class="nav-toggle" id="navToggle" aria-label="切换导航">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
     </nav>
 
     <!-- Hero 区域 -->
@@ -47,17 +26,17 @@
             <div class="hero-content">
                 <div class="hero-badge" data-animate="fade-up">
                     <span class="badge-dot"></span>
-                    新一代静态网页托管平台
+                    临港区教师网页课件共享平台
                 </div>
                 <h1 class="hero-title" data-animate="fade-up" data-delay="100">
                     极速托管你的<br>个人网页与项目
                 </h1>
                 <p class="hero-description" data-animate="fade-up" data-delay="200">
                     告别繁琐的服务器配置，上传即生成专属链接。<br>
-                    适合分享给特定对象或作为个人展示。
+                    让优秀的课件被看见、被共享。
                 </p>
                 <div class="hero-buttons" data-animate="fade-up" data-delay="300">
-                    <a href="/register" class="btn btn-primary">
+                    <a href="/subjects" class="btn btn-primary">
                         <span>开始免费托管</span>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -127,7 +106,7 @@
                         <span>📂</span>
                     </div>
                     <div class="step-number">1</div>
-                    <h3 class="step-title">上传文件</h3>
+                    <h3 class="step-title">上传课件</h3>
                     <p class="step-desc">将你的 HTML/CSS/JS 文件打包成 ZIP，点击上传按钮，或直接拖拽到控制台。</p>
                 </div>
                 <div class="step-connector" data-animate="fade-up" data-delay="200">
@@ -158,7 +137,7 @@
         </div>
     </section>
 
-    <!-- 特性展示区域 -->
+ <!-- 特性展示区域 -->
     <section class="features" id="features">
         <div class="section-container">
             <div class="section-header" data-animate="fade-up">
@@ -224,8 +203,8 @@
         </div>
         <div class="section-container">
             <div class="cta-content" data-animate="fade-up">
-                <h2 class="cta-title">准备好发布你的下一个想法了吗？</h2>
-                <p class="cta-desc">加入 Autoconfig，体验最纯粹的网页托管服务，仅需几秒钟即可开始。</p>
+                <h2 class="cta-title">加入临港区教师课件共享平台</h2>
+                <p class="cta-desc">注册成为教师或学生，开始共享优秀的网页课件，或在线完成超趋过关练习。</p>
                 <a href="/register" class="btn btn-primary btn-large">
                     <span>立即免费注册</span>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -264,15 +243,8 @@
     <script src="js/common.js"></script>
     <script src="js/main.js"></script>
     <script>
-        // 动态显示登录/控制台状态
         (async () => {
-            const user = await checkAuth();
-            const actions = document.getElementById('navActions');
-            if (user && actions) {
-                actions.innerHTML = `
-                    <a href="/dashboard" class="btn-register">控制台</a>
-                `;
-            }
+            await initNavbar('/');
         })();
     </script>
 </body>

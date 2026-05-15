@@ -3,10 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>聊天 - Autoconfig</title>
+    <title>聊天室 - Autoconfig</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/app.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <!-- Markdown 渲染 & 代码高亮 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/highlight.min.js"></script>
+    <!-- KaTeX 数学公式 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
     <style>
         .chat-page{min-height:100vh;background:var(--bg-dark);display:flex;flex-direction:column}
         .chat-header{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--bg-card);border-bottom:1px solid var(--border)}
@@ -16,90 +23,230 @@
         .chat-header .btn-back{color:var(--text-muted);text-decoration:none;font-size:.85rem;padding:6px 12px;border-radius:6px;border:1px solid var(--border);transition:all .2s}
         .chat-header .btn-back:hover{color:var(--text-primary);border-color:var(--border-hover)}
         .chat-container{display:flex;flex:1;margin-top:56px;height:calc(100vh - 56px)}
-        /* 左侧会话列表 */
-        .chat-sidebar{width:300px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg-card);flex-shrink:0}
-        .sidebar-header{padding:16px;border-bottom:1px solid var(--border);font-size:.9rem;font-weight:700;color:var(--text-primary)}
-        .conversation-list{flex:1;overflow-y:auto}
-        .conv-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;transition:all .15s;border-bottom:1px solid rgba(255,255,255,.03)}
-        .conv-item:hover{background:rgba(255,255,255,.03)}
-        .conv-item.active{background:rgba(99,102,241,.1);border-left:3px solid var(--primary)}
-        .conv-avatar{width:40px;height:40px;border-radius:50%;background:var(--gradient-2);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:.9rem;flex-shrink:0}
-        .conv-info{flex:1;min-width:0}
-        .conv-name{font-size:.88rem;font-weight:600;color:var(--text-primary)}
-        .conv-last{font-size:.78rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-        .conv-meta{text-align:right;flex-shrink:0}
-        .conv-time{font-size:.7rem;color:var(--text-muted);display:block}
-        .conv-unread{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font-size:.65rem;font-weight:700;line-height:18px;text-align:center;margin-top:4px}
-        .no-conversations{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:.9rem}
+
+        /* 左侧面板 */
+        .chat-sidebar{width:320px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg-card);flex-shrink:0}
+        .sidebar-tabs{display:flex;border-bottom:1px solid var(--border)}
+        .sidebar-tab{flex:1;padding:10px 8px;text-align:center;font-size:.78rem;font-weight:600;color:var(--text-muted);cursor:pointer;transition:all .15s;border-bottom:2px solid transparent}
+        .sidebar-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+        .sidebar-tab:hover{color:var(--text-primary)}
+        .sidebar-content{flex:1;overflow-y:auto}
+        .room-list,.conv-list{display:flex;flex-direction:column}
+        .room-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;transition:all .15s;border-bottom:1px solid rgba(255,255,255,.03)}
+        .room-item:hover{background:rgba(255,255,255,.03)}
+        .room-item.active{background:rgba(99,102,241,.1);border-left:3px solid var(--primary)}
+        .room-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+        .room-icon.dm{background:var(--gradient-2);border-radius:50%;font-size:.9rem;font-weight:700;color:#fff}
+        .room-icon.class{background:rgba(59,130,246,.15);color:#3b82f6}
+        .room-icon.group{background:rgba(16,185,129,.15);color:#10b981}
+        .room-icon.ticket{background:rgba(245,158,11,.15);color:#f59e0b}
+        .room-info{flex:1;min-width:0}
+        .room-name{font-size:.85rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .room-last{font-size:.75rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+        .room-meta{text-align:right;flex-shrink:0}
+        .room-time{font-size:.68rem;color:var(--text-muted);display:block}
+        .room-unread{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font-size:.63rem;font-weight:700;line-height:18px;text-align:center;margin-top:4px}
+        .no-rooms{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:.88rem}
+
         /* 右侧消息区 */
         .chat-main{flex:1;display:flex;flex-direction:column;min-width:0}
-        .chat-main-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:1rem}
+        .chat-main-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);gap:12px}
+        .chat-main-empty .icon{font-size:3rem;opacity:.4}
+
+        /* 消息头 */
         .msg-header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
-        .msg-header .msg-username{font-size:1rem;font-weight:700;color:var(--text-primary)}
-        .msg-header .msg-bio{font-size:.8rem;color:var(--text-muted)}
-        .msg-header-actions{margin-left:auto;display:flex;gap:8px}
-        .btn-gift{padding:6px 14px;border-radius:6px;font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid rgba(234,179,8,.3);background:rgba(234,179,8,.1);color:#eab308;font-family:inherit;transition:all .15s}
-        .btn-gift:hover{background:rgba(234,179,8,.2)}
-        .messages-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:8px}
-        .msg-item{display:flex;gap:8px;max-width:70%;animation:fadeIn .2s}
+        .msg-header .room-title{font-size:1rem;font-weight:700;color:var(--text-primary)}
+        .msg-header .room-subtitle{font-size:.78rem;color:var(--text-muted)}
+        .msg-header-actions{margin-left:auto;display:flex;gap:6px}
+        .msg-header-actions button{padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:inherit;transition:all .15s}
+        .msg-header-actions button:hover{color:var(--text-primary);border-color:var(--border-hover)}
+        .btn-bounty{border-color:rgba(234,179,8,.3)!important;color:#eab308!important;background:rgba(234,179,8,.05)!important}
+        .btn-mute{border-color:rgba(239,68,68,.3)!important;color:#ef4444!important}
+
+        /* 公告条 */
+        .announcement-bar{padding:8px 20px;background:rgba(59,130,246,.08);border-bottom:1px solid rgba(59,130,246,.2);font-size:.8rem;color:#60a5fa;display:none}
+        .announcement-bar.show{display:block}
+
+        /* 消息列表 */
+        .messages-area{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:6px}
+        .msg-item{display:flex;gap:8px;max-width:75%;animation:fadeIn .2s}
         .msg-item.me{align-self:flex-end;flex-direction:row-reverse}
-        .msg-bubble{padding:10px 14px;border-radius:12px;font-size:.88rem;line-height:1.5;word-break:break-word}
+        .msg-item.system{align-self:center;max-width:90%}
+        .msg-bubble{padding:10px 14px;border-radius:12px;font-size:.86rem;line-height:1.6;word-break:break-word;position:relative}
         .msg-item.other .msg-bubble{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);border-bottom-left-radius:4px}
         .msg-item.me .msg-bubble{background:var(--primary);color:#fff;border-bottom-right-radius:4px}
-        .msg-item.gift .msg-bubble{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);color:#eab308;text-align:center;border-radius:12px}
-        .msg-time{font-size:.65rem;color:var(--text-muted);align-self:flex-end;flex-shrink:0}
-        .msg-date-sep{text-align:center;padding:8px;font-size:.75rem;color:var(--text-muted)}
-        .msg-avatar{width:28px;height:28px;border-radius:50%;background:var(--gradient-2);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:.65rem;flex-shrink:0;margin-top:4px}
+        .msg-item.system .msg-bubble{background:rgba(255,255,255,.03);border:1px solid var(--border);color:var(--text-muted);text-align:center;font-size:.8rem;border-radius:8px}
+        .msg-bubble.bounty-msg{background:rgba(234,179,8,.08)!important;border:1px solid rgba(234,179,8,.3)!important;color:#eab308!important}
+        .msg-bubble.activity-msg{background:rgba(99,102,241,.08)!important;border:1px solid rgba(99,102,241,.3)!important;color:var(--primary)!important}
+        .msg-bubble.error-msg{background:rgba(239,68,68,.08)!important;border:1px solid rgba(239,68,68,.3)!important;color:#f87171!important}
+        .msg-bubble.ticket-msg{background:rgba(245,158,11,.08)!important;border:1px solid rgba(245,158,11,.3)!important;color:#f59e0b!important}
+
+        /* 代码块样式 */
+        .msg-bubble pre{margin:8px 0;padding:10px;border-radius:6px;background:rgba(0,0,0,.3);overflow-x:auto;font-size:.8rem}
+        .msg-bubble code{font-family:'JetBrains Mono',Consolas,monospace;font-size:.82rem}
+        .msg-bubble p{margin:4px 0}
+
+        /* 打赏徽标 */
+        .msg-tip-badge{position:absolute;bottom:-8px;right:8px;background:#eab308;color:#000;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:10px;cursor:pointer}
+        .msg-actions{display:none;position:absolute;top:-8px;right:8px;gap:4px}
+        .msg-bubble:hover .msg-actions{display:flex}
+        .msg-action-btn{width:22px;height:22px;border-radius:50%;background:var(--bg-card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.7rem;transition:all .15s}
+        .msg-action-btn:hover{background:var(--primary);border-color:var(--primary);color:#fff}
+
+        .msg-time{font-size:.63rem;color:var(--text-muted);align-self:flex-end;flex-shrink:0}
+        .msg-avatar{width:30px;height:30px;border-radius:50%;background:var(--gradient-2);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:.7rem;flex-shrink:0;margin-top:4px}
+        .msg-sender{font-size:.7rem;color:var(--text-muted);margin-bottom:2px;font-weight:600}
+        .msg-date-sep{text-align:center;padding:8px;font-size:.73rem;color:var(--text-muted)}
+
         /* 输入区域 */
-        .msg-input-area{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:10px;background:rgba(255,255,255,.02)}
-        .msg-input{flex:1;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:.9rem;font-family:inherit;outline:none;resize:none}
+        .msg-input-area{padding:12px 20px;border-top:1px solid var(--border);background:rgba(255,255,255,.02)}
+        .input-toolbar{display:flex;gap:6px;margin-bottom:8px}
+        .input-toolbar button{padding:4px 10px;border-radius:5px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:inherit;transition:all .15s}
+        .input-toolbar button:hover{color:var(--text-primary);border-color:var(--primary)}
+        .input-toolbar button.active{color:var(--primary);border-color:var(--primary);background:rgba(99,102,241,.1)}
+        .input-row{display:flex;gap:10px}
+        .msg-input{flex:1;padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:.88rem;font-family:'JetBrains Mono',Consolas,monospace;outline:none;resize:none;min-height:40px;max-height:200px}
         .msg-input:focus{border-color:var(--primary)}
-        .msg-send-btn{padding:10px 20px;background:var(--gradient-2);color:#fff;border:none;border-radius:8px;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+        .msg-send-btn{padding:10px 20px;background:var(--gradient-2);color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;align-self:flex-end}
         .msg-send-btn:hover{box-shadow:0 4px 20px var(--primary-glow)}
-        .msg-send-btn:disabled{opacity:.5;cursor:not-allowed}
-        /* Gift modal */
-        .gift-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center}
-        .gift-modal.show{display:flex}
-        .gift-box{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:360px;max-width:90vw}
-        .gift-box h3{margin-bottom:16px;color:var(--text-primary);font-size:1.1rem}
-        .gift-box input{width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:1rem;margin-bottom:12px;outline:none;font-family:inherit}
-        .gift-box input:focus{border-color:var(--primary)}
-        .gift-box .gift-balance{font-size:.82rem;color:var(--text-muted);margin-bottom:16px}
-        .gift-box .gift-actions{display:flex;gap:8px;justify-content:flex-end}
-        .gift-box .btn-cancel{padding:8px 16px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-family:inherit;font-size:.85rem}
-        .gift-box .btn-confirm{padding:8px 16px;border-radius:6px;background:#eab308;border:none;color:#000;font-weight:600;cursor:pointer;font-family:inherit;font-size:.85rem}
+
+        /* 活动卡片 */
+        .activity-card{background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:16px;margin:8px 0;max-width:400px}
+        .activity-card h4{color:var(--primary);margin-bottom:8px;font-size:.9rem}
+        .activity-card .timer{font-size:1.5rem;font-weight:700;color:#ef4444;text-align:center;margin:8px 0}
+        .activity-card button{width:100%;padding:10px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;margin-top:8px}
+
+        /* 弹窗通用 */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:none;align-items:center;justify-content:center}
+        .modal-overlay.show{display:flex}
+        .modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px;width:420px;max-width:90vw;max-height:80vh;overflow-y:auto}
+        .modal-box h3{margin-bottom:16px;color:var(--text-primary);font-size:1.1rem}
+        .modal-box label{display:block;font-size:.82rem;color:var(--text-muted);margin-bottom:4px;margin-top:12px}
+        .modal-box input,.modal-box textarea,.modal-box select{width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:.9rem;outline:none;font-family:inherit;box-sizing:border-box}
+        .modal-box input:focus,.modal-box textarea:focus{border-color:var(--primary)}
+        .modal-box textarea{min-height:80px;resize:vertical}
+        .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+        .modal-actions .btn-cancel{padding:8px 16px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-family:inherit;font-size:.85rem}
+        .modal-actions .btn-primary{padding:8px 16px;border-radius:6px;background:var(--primary);border:none;color:#fff;font-weight:600;cursor:pointer;font-family:inherit;font-size:.85rem}
+        .modal-actions .btn-gold{padding:8px 16px;border-radius:6px;background:#eab308;border:none;color:#000;font-weight:600;cursor:pointer;font-family:inherit;font-size:.85rem}
+
+        /* 飘窗动画 */
+        .celebration-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(99,102,241,.95);color:#fff;padding:20px 40px;border-radius:16px;font-size:1.2rem;font-weight:700;z-index:2000;animation:celebPop .5s ease;pointer-events:none}
+        @keyframes celebPop{0%{transform:translate(-50%,-50%) scale(0);opacity:0}50%{transform:translate(-50%,-50%) scale(1.2)}100%{transform:translate(-50%,-50%) scale(1);opacity:1}}
+
+        /* 打赏动效 */
+        .tip-animation{position:fixed;pointer-events:none;z-index:2000;font-size:2rem;animation:tipFloat 1.5s ease forwards}
+        @keyframes tipFloat{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-80px)}}
+
         @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-        @media(max-width:768px){.chat-sidebar{width:80px}.conv-info,.conv-meta,.sidebar-header span{display:none}.conv-item{justify-content:center;padding:12px 8px}}
+        @media(max-width:768px){.chat-sidebar{width:72px}.room-info,.room-meta,.sidebar-tabs span{display:none}.room-item{justify-content:center;padding:12px 8px}}
     </style>
 </head>
 <body>
     <div class="chat-page">
         <header class="chat-header">
             <a href="/dashboard" class="logo"><span class="icon">⚡</span> Autoconfig</a>
-            <h2>💬 聊天</h2>
+            <h2>💬 聊天室</h2>
             <a href="/dashboard" class="btn-back">← 返回控制台</a>
         </header>
         <div class="chat-container">
+            <!-- 左侧面板 -->
             <aside class="chat-sidebar">
-                <div class="sidebar-header">💬 <span>会话列表</span></div>
-                <div class="conversation-list" id="convList">
-                    <div class="no-conversations">暂无会话</div>
+                <div class="sidebar-tabs">
+                    <div class="sidebar-tab active" data-tab="rooms" onclick="switchTab('rooms')">🏠 <span>群聊</span></div>
+                    <div class="sidebar-tab" data-tab="dm" onclick="switchTab('dm')">💬 <span>私信</span></div>
+                    <div class="sidebar-tab" data-tab="tickets" onclick="switchTab('tickets')">🎫 <span>答疑</span></div>
+                </div>
+                <div class="sidebar-content" id="sidebarContent">
+                    <div class="no-rooms">加载中...</div>
                 </div>
             </aside>
+
+            <!-- 右侧消息区 -->
             <div class="chat-main" id="chatMain">
-                <div class="chat-main-empty" id="chatEmpty">👈 选择一个会话开始聊天</div>
+                <div class="chat-main-empty">
+                    <div class="icon">💬</div>
+                    <div>选择一个会话开始聊天</div>
+                    <div style="font-size:.8rem;color:var(--text-muted)">支持代码高亮、Markdown、LaTeX 公式</div>
+                </div>
             </div>
         </div>
-        <!-- 赠送金币弹窗 -->
-        <div class="gift-modal" id="giftModal">
-            <div class="gift-box">
-                <h3>🎁 赠送金币</h3>
-                <div>赠送给: <strong id="giftTarget">-</strong></div>
-                <input type="number" id="giftAmount" placeholder="输入金币数量" min="1" style="margin-top:12px">
-                <div class="gift-balance">你的余额: <span id="giftBalance">0</span> 🪙</div>
-                <div class="gift-actions">
-                    <button class="btn-cancel" onclick="closeGift()">取消</button>
-                    <button class="btn-confirm" onclick="confirmGift()">确认赠送</button>
+
+        <!-- 悬赏弹窗 -->
+        <div class="modal-overlay" id="bountyModal">
+            <div class="modal-box">
+                <h3>🏆 发布悬赏提问</h3>
+                <label>问题标题</label>
+                <input type="text" id="bountyTitle" placeholder="例: CSS flex居中不生效怎么办？">
+                <label>详细描述</label>
+                <textarea id="bountyContent" placeholder="描述你遇到的问题..."></textarea>
+                <label>悬赏金币 (1-100)</label>
+                <input type="number" id="bountyAmount" min="1" max="100" placeholder="10">
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:8px">你的余额: <span id="bountyBalance">0</span> 🪙</div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal('bountyModal')">取消</button>
+                    <button class="btn-gold" onclick="submitBounty()">发布悬赏</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 抢答/签到弹窗（教师用） -->
+        <div class="modal-overlay" id="activityModal">
+            <div class="modal-box">
+                <h3>⚡ 发起课堂互动</h3>
+                <label>活动类型</label>
+                <select id="activityType">
+                    <option value="quiz">🎯 抢答题</option>
+                    <option value="checkin">✋ 课堂签到</option>
+                    <option value="code_fill">💻 代码填空</option>
+                </select>
+                <label>题目/标题</label>
+                <input type="text" id="activityTitle" placeholder="请输入题目">
+                <div id="quizFields">
+                    <label>题目内容/代码</label>
+                    <textarea id="activityQuestion" placeholder="题目内容（支持代码）"></textarea>
+                    <label>正确答案</label>
+                    <input type="text" id="activityAnswer" placeholder="正确答案">
+                </div>
+                <label>限时 (秒)</label>
+                <input type="number" id="activityDuration" value="60" min="10" max="300">
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal('activityModal')">取消</button>
+                    <button class="btn-primary" onclick="submitActivity()">发起</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 打赏弹窗 -->
+        <div class="modal-overlay" id="tipModal">
+            <div class="modal-box">
+                <h3>🪙 打赏金币</h3>
+                <p style="font-size:.85rem;color:var(--text-muted)" id="tipTarget">打赏给: -</p>
+                <label>金币数量 (1-50)</label>
+                <input type="number" id="tipAmount" min="1" max="50" value="5" placeholder="5">
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:8px">你的余额: <span id="tipBalance">0</span> 🪙</div>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal('tipModal')">取消</button>
+                    <button class="btn-gold" onclick="submitTip()">打赏</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 答疑工单弹窗 -->
+        <div class="modal-overlay" id="ticketModal">
+            <div class="modal-box">
+                <h3>🎫 发起答疑工单</h3>
+                <label>问题标题</label>
+                <input type="text" id="ticketTitle" placeholder="描述你的问题">
+                <label>项目链接 (可选)</label>
+                <input type="text" id="ticketProject" placeholder="/site/username/project">
+                <label>报错信息 (可选)</label>
+                <textarea id="ticketError" placeholder="粘贴控制台报错信息..."></textarea>
+                <label>发送到班级</label>
+                <select id="ticketClass"><option value="">选择班级...</option></select>
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="closeModal('ticketModal')">取消</button>
+                    <button class="btn-primary" onclick="submitTicket()">提交工单</button>
                 </div>
             </div>
         </div>
@@ -107,201 +254,621 @@
 
     <script src="/js/common.js"></script>
     <script>
+        // ========== 全局状态 ==========
         let currentUser = null;
-        let activeChatUserId = null;
-        let activeChatUser = null;
+        let activeRoom = null;
+        let activeTab = 'rooms';
+        let ws = null;
         let pollTimer = null;
+        let msgInputMode = 'text'; // text | code | markdown
+        let tipTargetMsgId = null;
 
-        // URL中是否指定了聊天对象
-        const chatTarget = window.location.pathname.split('/').filter(Boolean)[1] || null;
-
+        // ========== 初始化 ==========
         (async () => {
             currentUser = await checkAuth();
             if (!currentUser) { window.location.href = '/login'; return; }
 
+            // 配置 marked
+            if (window.marked) {
+                marked.setOptions({
+                    highlight: (code, lang) => {
+                        if (hljs && lang && hljs.getLanguage(lang)) return hljs.highlight(code, { language: lang }).value;
+                        return hljs ? hljs.highlightAuto(code).value : code;
+                    },
+                    breaks: true
+                });
+            }
+
+            initWebSocket();
+            loadRooms();
             loadConversations();
 
-            // 如果URL指定了用户名，自动打开该对话
+            // URL参数处理
+            const chatTarget = window.location.pathname.split('/').filter(Boolean)[1] || null;
             if (chatTarget) {
                 try {
                     const data = await api('/api/chat/user-by-name/' + encodeURIComponent(chatTarget));
-                    if (data.user) openChat(data.user.id, data.user.username, data.user.bio);
-                } catch (err) {
-                    showToast('用户不存在: ' + chatTarget, 'error');
-                }
+                    if (data.user) { switchTab('dm'); openLegacyChat(data.user.id, data.user.username); }
+                } catch {}
             }
         })();
 
-        async function loadConversations() {
-            try {
-                const data = await api('/api/chat/conversations');
-                renderConversations(data.conversations);
-            } catch {}
+        // ========== WebSocket ==========
+        function initWebSocket() {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+            ws.onopen = () => {
+                const token = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('token='));
+                if (token) ws.send(JSON.stringify({ type: 'auth', token: token.split('=')[1] }));
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleWsMessage(msg);
+            };
+
+            ws.onclose = () => { setTimeout(initWebSocket, 3000); };
         }
 
-        function renderConversations(conversations) {
-            const el = document.getElementById('convList');
-            if (!conversations.length) {
-                el.innerHTML = '<div class="no-conversations">暂无会话<br><small style="color:var(--text-muted);font-size:.75rem">在项目页点击「联系作者」开始聊天</small></div>';
+        function handleWsMessage(msg) {
+            switch (msg.type) {
+                case 'new_message':
+                    if (activeRoom && activeRoom.id === msg.roomId) {
+                        appendMessage(msg.message);
+                    }
+                    refreshSidebar();
+                    break;
+                case 'activity':
+                    if (activeRoom && activeRoom.id === msg.roomId) loadRoomMessages(activeRoom.id);
+                    break;
+                case 'celebration':
+                    showCelebration(msg);
+                    break;
+                case 'tip':
+                    showTipAnimation(msg.tip);
+                    break;
+                case 'typing':
+                    // Could show typing indicator
+                    break;
+            }
+        }
+
+        // ========== Tab 切换 ==========
+        function switchTab(tab) {
+            activeTab = tab;
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            if (tab === 'rooms') loadRooms();
+            else if (tab === 'dm') loadConversations();
+            else if (tab === 'tickets') loadTickets();
+        }
+
+        // ========== 群聊房间 ==========
+        async function loadRooms() {
+            try {
+                const data = await api('/api/chat/rooms');
+                renderRooms(data.rooms || []);
+            } catch { renderRooms([]); }
+        }
+
+        function renderRooms(rooms) {
+            const el = document.getElementById('sidebarContent');
+            if (!rooms.length) {
+                el.innerHTML = '<div class="no-rooms">暂无群聊<br><small>在班级页面创建班级群</small></div>';
                 return;
             }
-            el.innerHTML = conversations.map(c => `
-                <div class="conv-item ${c.user_id === activeChatUserId ? 'active' : ''}" onclick="openChat(${c.user_id}, '${esc(c.username)}', '')">
-                    <div class="conv-avatar">${c.username[0].toUpperCase()}</div>
-                    <div class="conv-info">
-                        <div class="conv-name">${esc(c.username)}</div>
-                        <div class="conv-last">${c.last_type === 'gift' ? '🎁 ' : ''}${esc(c.last_message || '')}</div>
-                    </div>
-                    <div class="conv-meta">
-                        <span class="conv-time">${formatTime(c.last_time)}</span>
-                        ${c.unread > 0 ? '<span class="conv-unread">' + c.unread + '</span>' : ''}
-                    </div>
-                </div>
-            `).join('');
+            el.innerHTML = rooms.map(r => {
+                const typeIcon = r.type === 'class' ? 'class' : r.type === 'group' ? 'group' : r.type === 'ticket' ? 'ticket' : 'dm';
+                const icon = r.type === 'class' ? '🏫' : r.type === 'group' ? '👥' : r.type === 'ticket' ? '🎫' : (r.dm_user?.username?.[0]?.toUpperCase() || '?');
+                const name = r.type === 'dm' ? (r.dm_user?.username || '私信') : r.name;
+                return `
+                    <div class="room-item ${activeRoom && activeRoom.id === r.id ? 'active' : ''}" onclick="openRoom(${r.id})">
+                        <div class="room-icon ${typeIcon}">${icon}</div>
+                        <div class="room-info">
+                            <div class="room-name">${esc(name)}</div>
+                            <div class="room-last">${esc((r.last_message || '').substring(0, 30))}</div>
+                        </div>
+                        <div class="room-meta">
+                            <span class="room-time">${formatTime(r.last_time)}</span>
+                            ${r.unread > 0 ? '<span class="room-unread">' + r.unread + '</span>' : ''}
+                        </div>
+                    </div>`;
+            }).join('');
         }
 
-        async function openChat(userId, username, bio) {
-            activeChatUserId = userId;
-            activeChatUser = { id: userId, username };
-            if (pollTimer) clearInterval(pollTimer);
+        async function openRoom(roomId) {
+            try {
+                const data = await api('/api/chat/rooms/' + roomId);
+                activeRoom = data.room;
+                activeRoom.members = data.members;
+                activeRoom.myRole = data.myRole;
+                activeRoom.bounties = data.bounties;
+                activeRoom.activities = data.activities;
 
-            // Mark sidebar active
-            document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.conv-item').forEach(el => {
-                if (el.onclick && el.onclick.toString().includes(userId)) el.classList.add('active');
-            });
+                renderRoomUI();
+                await loadRoomMessages(roomId);
 
+                if (ws && ws.readyState === 1) {
+                    ws.send(JSON.stringify({ type: 'join_room', roomId }));
+                }
+            } catch (err) { showToast('无法打开聊天室', 'error'); }
+        }
+
+        function renderRoomUI() {
+            const r = activeRoom;
+            const isAdmin = r.myRole === 'admin';
             const main = document.getElementById('chatMain');
+
+            let headerActions = '';
+            if (r.type !== 'dm') {
+                headerActions += `<button class="btn-bounty" onclick="openModal('bountyModal')">🏆 悬赏</button>`;
+                if (isAdmin) {
+                    headerActions += `<button class="btn-mute" onclick="toggleMuteAll()">${r.is_muted ? '🔊 解除禁言' : '🔇 全员禁言'}</button>`;
+                    headerActions += `<button onclick="openModal('activityModal')">⚡ 互动</button>`;
+                }
+            }
+
+            const roomName = r.type === 'dm' ? (r.members?.find(m => m.id !== currentUser.id)?.username || '私信') : r.name;
+            const subtitle = r.type === 'dm' ? '' : `${r.members?.length || 0} 人`;
+
             main.innerHTML = `
                 <div class="msg-header">
-                    <div class="conv-avatar" style="width:36px;height:36px;font-size:.85rem">${username[0].toUpperCase()}</div>
                     <div>
-                        <div class="msg-username">${esc(username)}</div>
-                        <div class="msg-bio">${bio ? esc(bio) : ''}</div>
+                        <div class="room-title">${esc(roomName)}</div>
+                        <div class="room-subtitle">${subtitle}</div>
                     </div>
-                    <div class="msg-header-actions">
-                        <button class="btn-gift" onclick="openGift()">🎁 赠送金币</button>
-                    </div>
+                    <div class="msg-header-actions">${headerActions}</div>
                 </div>
+                <div class="announcement-bar ${r.announcement ? 'show' : ''}" id="announcement">📢 ${esc(r.announcement || '')}</div>
                 <div class="messages-area" id="messagesArea"></div>
                 <div class="msg-input-area">
-                    <input type="text" class="msg-input" id="msgInput" placeholder="输入消息..." maxlength="1000" onkeydown="if(event.key==='Enter')sendMsg()">
-                    <button class="msg-send-btn" onclick="sendMsg()">发送</button>
+                    <div class="input-toolbar">
+                        <button class="${msgInputMode === 'text' ? 'active' : ''}" onclick="setInputMode('text')">📝 文本</button>
+                        <button class="${msgInputMode === 'code' ? 'active' : ''}" onclick="setInputMode('code')">💻 代码</button>
+                        <button class="${msgInputMode === 'markdown' ? 'active' : ''}" onclick="setInputMode('markdown')">📄 Markdown</button>
+                        <button onclick="openModal('ticketModal')" style="margin-left:auto">🚨 报错求助</button>
+                    </div>
+                    <div class="input-row">
+                        <textarea class="msg-input" id="msgInput" placeholder="输入消息... (Shift+Enter 换行)" rows="1" onkeydown="handleInputKey(event)"></textarea>
+                        <button class="msg-send-btn" onclick="sendRoomMsg()">发送</button>
+                    </div>
                 </div>
             `;
 
-            await loadMessages(userId);
-            // Poll for new messages every 3s
-            pollTimer = setInterval(() => loadMessages(userId, true), 3000);
-        }
-
-        async function loadMessages(userId, silent) {
-            try {
-                const data = await api('/api/chat/messages/' + userId);
-                if (data.user) activeChatUser = data.user;
-                renderMessages(data.messages);
-                if (!silent) loadConversations(); // refresh sidebar unread
-            } catch (err) {
-                if (!silent) showToast('加载消息失败', 'error');
+            // 渲染活跃悬赏
+            if (r.bounties?.length) {
+                const area = document.getElementById('messagesArea');
+                r.bounties.forEach(b => {
+                    const div = document.createElement('div');
+                    div.className = 'activity-card';
+                    div.innerHTML = `<h4>🏆 悬赏 ${b.amount} 金币 | ${esc(b.title)}</h4><p style="font-size:.82rem;color:var(--text-muted)">${esc(b.content || '')}</p><p style="font-size:.75rem">发起人: ${esc(b.author_name)}</p>`;
+                    area.prepend(div);
+                });
             }
         }
 
-        function renderMessages(messages) {
+        async function loadRoomMessages(roomId) {
+            try {
+                const data = await api('/api/chat/rooms/' + roomId + '/messages');
+                renderRoomMessages(data.messages || []);
+            } catch {}
+        }
+
+        function renderRoomMessages(messages) {
             const area = document.getElementById('messagesArea');
             if (!area) return;
-            const wasAtBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 60;
-
-            if (!messages.length) {
-                area.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;font-size:.9rem">👋 发送第一条消息吧！</div>';
-                return;
-            }
 
             let html = '';
             let lastDate = '';
             messages.forEach(m => {
                 const date = new Date(m.created_at).toLocaleDateString('zh-CN');
-                if (date !== lastDate) {
-                    html += '<div class="msg-date-sep">' + date + '</div>';
-                    lastDate = date;
-                }
-                const isMe = m.from_id === currentUser.id;
-                const isGift = m.type === 'gift';
-                const cls = isGift ? 'msg-item gift' : (isMe ? 'msg-item me' : 'msg-item other');
-                const time = new Date(m.created_at).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
-
-                if (isGift) {
-                    html += `<div class="${cls}" style="align-self:center;max-width:80%"><div class="msg-bubble">${esc(m.content)}</div><span class="msg-time">${time}</span></div>`;
-                } else {
-                    const avatar = isMe ? currentUser.username[0].toUpperCase() : (m.from_username || '?')[0].toUpperCase();
-                    html += `<div class="${cls}"><div class="msg-avatar">${avatar}</div><div class="msg-bubble">${esc(m.content)}</div><span class="msg-time">${time}</span></div>`;
-                }
+                if (date !== lastDate) { html += `<div class="msg-date-sep">${date}</div>`; lastDate = date; }
+                html += renderSingleMessage(m);
             });
+
+            const cards = area.querySelectorAll('.activity-card');
             area.innerHTML = html;
-            if (wasAtBottom) area.scrollTop = area.scrollHeight;
+            cards.forEach(c => area.prepend(c));
+            area.scrollTop = area.scrollHeight;
         }
 
-        async function sendMsg() {
+        function renderSingleMessage(m) {
+            const isMe = m.sender_id === currentUser.id;
+            const time = new Date(m.created_at).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+
+            if (m.type === 'system') {
+                return `<div class="msg-item system"><div class="msg-bubble">${renderContent(m.content, m.type)}</div></div>`;
+            }
+
+            const bubbleClass = m.type === 'bounty' ? 'bounty-msg' : m.type === 'activity' ? 'activity-msg' : m.type === 'error_share' ? 'error-msg' : m.type === 'ticket' ? 'ticket-msg' : '';
+            const cls = isMe ? 'msg-item me' : 'msg-item other';
+            const avatar = (m.sender_name || '?')[0].toUpperCase();
+            const tipBadge = m.tip_total > 0 ? `<div class="msg-tip-badge">🪙 ${m.tip_total}</div>` : '';
+            const actions = !isMe ? `<div class="msg-actions"><div class="msg-action-btn" onclick="openTip(${m.id}, '${esc(m.sender_name)}')">🪙</div></div>` : '';
+
+            const senderLine = (!isMe && activeRoom?.type !== 'dm') ? `<div class="msg-sender">${esc(m.sender_name)}</div>` : '';
+
+            // 活动卡片特殊渲染
+            if (m.type === 'activity') {
+                const meta = JSON.parse(m.metadata || '{}');
+                return `<div class="msg-item system" style="max-width:400px">
+                    <div class="activity-card">
+                        <h4>${renderContent(m.content, 'text')}</h4>
+                        ${meta.activityId && !isMe ? `<button onclick="respondActivity(${meta.activityId})">🖐️ 参与</button>` : ''}
+                    </div>
+                </div>`;
+            }
+
+            return `<div class="${cls}">
+                ${!isMe ? `<div class="msg-avatar">${avatar}</div>` : ''}
+                <div>
+                    ${senderLine}
+                    <div class="msg-bubble ${bubbleClass}">
+                        ${actions}
+                        ${renderContent(m.content, m.type)}
+                        ${tipBadge}
+                    </div>
+                </div>
+                <span class="msg-time">${time}</span>
+            </div>`;
+        }
+
+        function renderContent(content, type) {
+            if (type === 'code') {
+                const highlighted = hljs ? hljs.highlightAuto(content).value : esc(content);
+                return `<pre><code>${highlighted}</code></pre>`;
+            }
+            if (type === 'markdown' || type === 'bounty' || type === 'ticket' || type === 'error_share') {
+                if (window.marked) {
+                    let html = marked.parse(content);
+                    // LaTeX 支持
+                    html = html.replace(/\$\$(.+?)\$\$/gs, (_, tex) => {
+                        try { return katex.renderToString(tex, { displayMode: true }); } catch { return `$$${tex}$$`; }
+                    });
+                    html = html.replace(/\$(.+?)\$/g, (_, tex) => {
+                        try { return katex.renderToString(tex, { displayMode: false }); } catch { return `$${tex}$`; }
+                    });
+                    return html;
+                }
+            }
+            return esc(content).replace(/\n/g, '<br>');
+        }
+
+        function appendMessage(m) {
+            const area = document.getElementById('messagesArea');
+            if (!area) return;
+            const html = renderSingleMessage(m);
+            area.insertAdjacentHTML('beforeend', html);
+            area.scrollTop = area.scrollHeight;
+        }
+
+        // ========== 发送消息 ==========
+        function setInputMode(mode) {
+            msgInputMode = mode;
+            document.querySelectorAll('.input-toolbar button').forEach((btn, i) => {
+                if (i < 3) btn.classList.toggle('active', btn.textContent.includes(mode === 'text' ? '文本' : mode === 'code' ? '代码' : 'Markdown'));
+            });
+            const input = document.getElementById('msgInput');
+            if (mode === 'code') input.placeholder = '输入代码... (自动高亮)';
+            else if (mode === 'markdown') input.placeholder = '支持 Markdown 和 $LaTeX$ 公式';
+            else input.placeholder = '输入消息... (Shift+Enter 换行)';
+        }
+
+        function handleInputKey(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendRoomMsg();
+            }
+        }
+
+        async function sendRoomMsg() {
             const input = document.getElementById('msgInput');
             const content = input.value.trim();
-            if (!content || !activeChatUserId) return;
+            if (!content || !activeRoom) return;
             input.value = '';
+
             try {
-                await api('/api/chat/send', { method: 'POST', body: { toUserId: activeChatUserId, content } });
-                await loadMessages(activeChatUserId);
-                loadConversations();
+                const data = await api('/api/chat/rooms/' + activeRoom.id + '/messages', {
+                    method: 'POST',
+                    body: { content, type: msgInputMode, metadata: {} }
+                });
+                if (data.message) appendMessage(data.message);
+                refreshSidebar();
             } catch (err) {
                 showToast(err.message, 'error');
                 input.value = content;
             }
         }
 
-        function openGift() {
-            if (!activeChatUser) return;
-            document.getElementById('giftTarget').textContent = activeChatUser.username;
-            document.getElementById('giftBalance').textContent = currentUser.coins || 0;
-            document.getElementById('giftAmount').value = '';
-            document.getElementById('giftModal').classList.add('show');
-        }
-
-        function closeGift() {
-            document.getElementById('giftModal').classList.remove('show');
-        }
-
-        async function confirmGift() {
-            const amount = parseInt(document.getElementById('giftAmount').value);
-            if (!amount || amount <= 0) { showToast('请输入有效金额', 'error'); return; }
+        // ========== 教师功能 ==========
+        async function toggleMuteAll() {
+            if (!activeRoom) return;
+            const newMuted = !activeRoom.is_muted;
             try {
-                const data = await api('/api/chat/gift-coins', {
+                await api('/api/chat/rooms/' + activeRoom.id + '/mute-all', { method: 'POST', body: { muted: newMuted } });
+                activeRoom.is_muted = newMuted;
+                showToast(newMuted ? '已开启全员禁言' : '已解除全员禁言', 'success');
+                renderRoomUI();
+                loadRoomMessages(activeRoom.id);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        // ========== 悬赏 ==========
+        async function submitBounty() {
+            const title = document.getElementById('bountyTitle').value.trim();
+            const content = document.getElementById('bountyContent').value.trim();
+            const amount = parseInt(document.getElementById('bountyAmount').value);
+            if (!title || !amount) { showToast('请填写完整', 'error'); return; }
+            try {
+                await api('/api/chat/bounties', { method: 'POST', body: { roomId: activeRoom.id, title, content, amount } });
+                closeModal('bountyModal');
+                showToast('悬赏已发布！', 'success');
+                loadRoomMessages(activeRoom.id);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        // ========== 课堂活动 ==========
+        async function submitActivity() {
+            const type = document.getElementById('activityType').value;
+            const title = document.getElementById('activityTitle').value.trim();
+            const question = document.getElementById('activityQuestion')?.value || '';
+            const answer = document.getElementById('activityAnswer')?.value || '';
+            const duration = parseInt(document.getElementById('activityDuration').value) || 60;
+            try {
+                await api('/api/chat/activities', {
                     method: 'POST',
-                    body: { toUserId: activeChatUserId, amount }
+                    body: { roomId: activeRoom.id, type, title, content: { question, answer }, duration }
                 });
+                closeModal('activityModal');
+                showToast('活动已发起！', 'success');
+                loadRoomMessages(activeRoom.id);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function respondActivity(activityId) {
+            const answer = prompt('请输入你的回答:');
+            if (answer === null) return;
+            try {
+                const data = await api('/api/chat/activities/' + activityId + '/respond', {
+                    method: 'POST', body: { answer }
+                });
+                if (data.isCorrect) {
+                    showToast(`✅ 回答正确！第${data.rank}名，获得${data.coinsEarned}金币`, 'success');
+                } else {
+                    showToast('❌ 回答错误', 'error');
+                }
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        // ========== 打赏 ==========
+        function openTip(msgId, senderName) {
+            tipTargetMsgId = msgId;
+            document.getElementById('tipTarget').textContent = '打赏给: ' + senderName;
+            document.getElementById('tipBalance').textContent = currentUser.coins || 0;
+            openModal('tipModal');
+        }
+
+        async function submitTip() {
+            const amount = parseInt(document.getElementById('tipAmount').value);
+            if (!amount || !tipTargetMsgId) { showToast('请输入有效金额', 'error'); return; }
+            try {
+                const data = await api('/api/chat/tips', { method: 'POST', body: { messageId: tipTargetMsgId, amount } });
+                currentUser.coins = data.remaining;
+                closeModal('tipModal');
+                showToast('打赏成功！', 'success');
+                showTipAnimation({ amount });
+                loadRoomMessages(activeRoom.id);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        // ========== 答疑工单 ==========
+        async function submitTicket() {
+            const title = document.getElementById('ticketTitle').value.trim();
+            const projectUrl = document.getElementById('ticketProject').value.trim();
+            const errorLog = document.getElementById('ticketError').value.trim();
+            const classId = document.getElementById('ticketClass').value;
+            if (!title) { showToast('标题不能为空', 'error'); return; }
+            try {
+                await api('/api/chat/tickets', { method: 'POST', body: { title, projectUrl, errorLog, classId: classId || undefined } });
+                closeModal('ticketModal');
+                showToast('工单已提交！', 'success');
+                if (activeRoom) loadRoomMessages(activeRoom.id);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function loadTickets() {
+            try {
+                const data = await api('/api/chat/tickets');
+                const el = document.getElementById('sidebarContent');
+                if (!data.tickets?.length) {
+                    el.innerHTML = '<div class="no-rooms">暂无答疑工单<br><button onclick="openModal(\'ticketModal\')" style="margin-top:8px;padding:6px 12px;border-radius:6px;background:var(--primary);color:#fff;border:none;cursor:pointer;font-size:.82rem">+ 发起提问</button></div>';
+                    return;
+                }
+                el.innerHTML = data.tickets.map(t => `
+                    <div class="room-item" onclick="openRoom(${t.room_id})">
+                        <div class="room-icon ticket">🎫</div>
+                        <div class="room-info">
+                            <div class="room-name">${esc(t.title)}</div>
+                            <div class="room-last">${t.status === 'open' ? '⏳ 待接单' : t.status === 'in_progress' ? '🔧 处理中' : '✅ 已解决'} · ${esc(t.student_name)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch { }
+        }
+
+        // ========== 兼容旧版私信 ==========
+        async function loadConversations() {
+            try {
+                const data = await api('/api/chat/conversations');
+                if (activeTab === 'dm') renderConvList(data.conversations || []);
+            } catch {}
+        }
+
+        function renderConvList(conversations) {
+            const el = document.getElementById('sidebarContent');
+            if (!conversations.length) {
+                el.innerHTML = '<div class="no-rooms">暂无私信<br><small>在项目页点击「联系作者」</small></div>';
+                return;
+            }
+            el.innerHTML = conversations.map(c => `
+                <div class="room-item" onclick="openLegacyChat(${c.user_id}, '${esc(c.username)}')">
+                    <div class="room-icon dm">${c.username[0].toUpperCase()}</div>
+                    <div class="room-info">
+                        <div class="room-name">${esc(c.username)}</div>
+                        <div class="room-last">${c.last_type === 'gift' ? '🎁 ' : ''}${esc((c.last_message || '').substring(0, 25))}</div>
+                    </div>
+                    <div class="room-meta">
+                        <span class="room-time">${formatTime(c.last_time)}</span>
+                        ${c.unread > 0 ? '<span class="room-unread">' + c.unread + '</span>' : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        let legacyChatUserId = null;
+        async function openLegacyChat(userId, username) {
+            legacyChatUserId = userId;
+            activeRoom = null;
+            if (pollTimer) clearInterval(pollTimer);
+
+            const main = document.getElementById('chatMain');
+            main.innerHTML = `
+                <div class="msg-header">
+                    <div class="msg-avatar" style="width:36px;height:36px;font-size:.85rem">${username[0].toUpperCase()}</div>
+                    <div><div class="room-title">${esc(username)}</div></div>
+                    <div class="msg-header-actions">
+                        <button class="btn-bounty" onclick="giftCoinsLegacy()">🎁 赠送金币</button>
+                    </div>
+                </div>
+                <div class="messages-area" id="messagesArea"></div>
+                <div class="msg-input-area">
+                    <div class="input-toolbar">
+                        <button class="active" onclick="setInputMode('text')">📝 文本</button>
+                        <button onclick="setInputMode('code')">💻 代码</button>
+                        <button onclick="setInputMode('markdown')">📄 Markdown</button>
+                    </div>
+                    <div class="input-row">
+                        <textarea class="msg-input" id="msgInput" placeholder="输入消息..." rows="1" onkeydown="handleLegacyKey(event)"></textarea>
+                        <button class="msg-send-btn" onclick="sendLegacyMsg()">发送</button>
+                    </div>
+                </div>`;
+
+            await loadLegacyMessages(userId);
+            pollTimer = setInterval(() => loadLegacyMessages(userId, true), 3000);
+        }
+
+        async function loadLegacyMessages(userId, silent) {
+            try {
+                const data = await api('/api/chat/messages/' + userId);
+                renderLegacyMessages(data.messages);
+                if (!silent) loadConversations();
+            } catch {}
+        }
+
+        function renderLegacyMessages(messages) {
+            const area = document.getElementById('messagesArea');
+            if (!area) return;
+            if (!messages.length) { area.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">👋 发送第一条消息吧！</div>'; return; }
+
+            let html = '', lastDate = '';
+            messages.forEach(m => {
+                const date = new Date(m.created_at).toLocaleDateString('zh-CN');
+                if (date !== lastDate) { html += `<div class="msg-date-sep">${date}</div>`; lastDate = date; }
+                const isMe = m.from_id === currentUser.id;
+                const isGift = m.type === 'gift';
+                const time = new Date(m.created_at).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+
+                if (isGift) {
+                    html += `<div class="msg-item system"><div class="msg-bubble bounty-msg">${esc(m.content)}</div><span class="msg-time">${time}</span></div>`;
+                } else {
+                    const cls = isMe ? 'msg-item me' : 'msg-item other';
+                    const avatar = isMe ? currentUser.username[0].toUpperCase() : (m.from_username || '?')[0].toUpperCase();
+                    html += `<div class="${cls}">
+                        ${!isMe ? `<div class="msg-avatar">${avatar}</div>` : ''}
+                        <div class="msg-bubble">${renderContent(m.content, m.type || 'text')}</div>
+                        <span class="msg-time">${time}</span>
+                    </div>`;
+                }
+            });
+            area.innerHTML = html;
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function handleLegacyKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendLegacyMsg(); } }
+
+        async function sendLegacyMsg() {
+            const input = document.getElementById('msgInput');
+            const content = input.value.trim();
+            if (!content || !legacyChatUserId) return;
+            input.value = '';
+            try {
+                await api('/api/chat/send', { method: 'POST', body: { toUserId: legacyChatUserId, content, type: msgInputMode } });
+                await loadLegacyMessages(legacyChatUserId);
+                loadConversations();
+            } catch (err) { showToast(err.message, 'error'); input.value = content; }
+        }
+
+        async function giftCoinsLegacy() {
+            const amount = prompt('输入赠送金币数量:');
+            if (!amount || parseInt(amount) <= 0) return;
+            try {
+                const data = await api('/api/chat/gift-coins', { method: 'POST', body: { toUserId: legacyChatUserId, amount: parseInt(amount) } });
                 showToast(data.message, 'success');
                 currentUser.coins = data.coins;
-                closeGift();
-                await loadMessages(activeChatUserId);
-                loadConversations();
-            } catch (err) {
-                showToast(err.message, 'error');
-            }
+                await loadLegacyMessages(legacyChatUserId);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        // ========== UI 辅助 ==========
+        function refreshSidebar() {
+            if (activeTab === 'rooms') loadRooms();
+            else if (activeTab === 'dm') loadConversations();
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('show');
+            if (id === 'bountyModal') document.getElementById('bountyBalance').textContent = currentUser.coins || 0;
+        }
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+        function showCelebration(data) {
+            const div = document.createElement('div');
+            div.className = 'celebration-toast';
+            div.textContent = `🎉 ${data.username || ''} 第${data.rank}名！+${data.coinsEarned || 0}🪙`;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+
+        function showTipAnimation(tip) {
+            const div = document.createElement('div');
+            div.className = 'tip-animation';
+            div.textContent = `🪙 +${tip.amount}`;
+            div.style.left = '50%';
+            div.style.top = '50%';
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 1500);
         }
 
         function formatTime(ts) {
             if (!ts) return '';
-            const d = new Date(ts);
-            const now = new Date();
-            const diff = now - d;
+            const d = new Date(ts); const now = new Date(); const diff = now - d;
             if (diff < 60000) return '刚刚';
             if (diff < 3600000) return Math.floor(diff/60000) + '分钟前';
-            if (diff < 86400000) return d.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+            if (diff < 86400000) return d.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
             if (diff < 604800000) return Math.floor(diff/86400000) + '天前';
             return d.toLocaleDateString('zh-CN');
         }
 
-        function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-        // Close gift modal on outside click
-        document.getElementById('giftModal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('giftModal')) closeGift();
+        // 弹窗外部点击关闭
+        document.querySelectorAll('.modal-overlay').forEach(m => {
+            m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+        });
+
+        // 活动类型切换
+        document.getElementById('activityType')?.addEventListener('change', function() {
+            document.getElementById('quizFields').style.display = this.value === 'checkin' ? 'none' : 'block';
         });
     </script>
 </body>

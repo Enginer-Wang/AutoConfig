@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班级学情看板 - Autoconfig</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; min-height: 100vh; }
+        
+        .analytics-header { padding: 20px 32px; background: #1a1f26; border-bottom: 1px solid #2d3640; display: flex; justify-content: space-between; align-items: center; }
+        .analytics-header h1 { font-size: 20px; }
+        .analytics-header .class-selector { display: flex; align-items: center; gap: 12px; }
+        .analytics-header select { padding: 8px 16px; background: #1e252c; border: 1px solid #2d3640; border-radius: 8px; color: #e7e9ea; font-size: 14px; outline: none; }
+        .analytics-header .nav-links { display: flex; gap: 8px; }
+        .analytics-header .nav-links a { padding: 8px 16px; background: #2d3640; color: #e7e9ea; text-decoration: none; border-radius: 8px; font-size: 13px; }
+        .analytics-header .nav-links a:hover { background: #3d4854; }
+
+        .analytics-body { padding: 24px 32px; max-width: 1440px; margin: 0 auto; }
+
+        .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .section-title .icon { font-size: 18px; }
+
+        /* 预警面板 */
+        .alerts-panel { background: #1a1f26; border: 1px solid #2d3640; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+        .alert-list { display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; }
+        .alert-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #15191e; border-radius: 8px; border-left: 4px solid; }
+        .alert-item.high { border-left-color: #f4212e; background: rgba(244, 33, 46, 0.05); }
+        .alert-item.medium { border-left-color: #ffb800; background: rgba(255, 184, 0, 0.05); }
+        .alert-item.low { border-left-color: #1d9bf0; background: rgba(29, 155, 240, 0.05); }
+        .alert-item .alert-avatar { width: 36px; height: 36px; border-radius: 50%; background: #2d3640; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .alert-item .alert-info { flex: 1; }
+        .alert-item .alert-info .student { font-size: 14px; font-weight: 500; }
+        .alert-item .alert-info .detail { font-size: 12px; color: #8b98a5; margin-top: 2px; }
+        .alert-item .alert-actions { display: flex; gap: 6px; }
+        .alert-item .alert-actions button { padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; }
+        .btn-sm-primary { background: #1d9bf0; color: #fff; }
+        .btn-sm-resolve { background: #00ba7c; color: #fff; }
+        .empty-msg { text-align: center; color: #8b98a5; padding: 20px; font-size: 14px; }
+
+        /* 能力雷达区 */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+        .card { background: #1a1f26; border: 1px solid #2d3640; border-radius: 12px; padding: 20px; }
+
+        /* 雷达图（CSS实现） */
+        .radar-container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+        .radar-card { background: #15191e; border-radius: 10px; padding: 16px; width: 200px; text-align: center; }
+        .radar-card .student-name { font-size: 13px; font-weight: 500; margin-bottom: 10px; }
+        .radar-visual { position: relative; width: 150px; height: 150px; margin: 0 auto; }
+        .radar-visual svg { width: 100%; height: 100%; }
+        .radar-values { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 8px; }
+        .radar-values span { font-size: 10px; padding: 2px 6px; background: #2d3640; border-radius: 4px; color: #8b98a5; }
+
+        /* 代码活跃度热力图 */
+        .heatmap-container { overflow-x: auto; }
+        .heatmap-row { display: flex; align-items: center; gap: 2px; margin-bottom: 3px; }
+        .heatmap-row .label { width: 80px; font-size: 11px; color: #8b98a5; text-align: right; padding-right: 8px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .heatmap-cell { width: 12px; height: 12px; border-radius: 2px; background: #161b22; }
+        .heatmap-cell.l1 { background: #0e4429; }
+        .heatmap-cell.l2 { background: #006d32; }
+        .heatmap-cell.l3 { background: #26a641; }
+        .heatmap-cell.l4 { background: #39d353; }
+        .heatmap-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; color: #8b98a5; justify-content: flex-end; }
+
+        /* 分组面板 */
+        .groups-panel { display: flex; flex-wrap: wrap; gap: 16px; }
+        .group-card { background: #15191e; border: 1px solid #2d3640; border-radius: 10px; padding: 16px; min-width: 200px; flex: 1; }
+        .group-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1d9bf0; }
+        .group-card .member { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+        .group-card .member .role-badge { font-size: 10px; padding: 1px 5px; background: #1d3a5c; color: #1d9bf0; border-radius: 3px; }
+
+        .action-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+        .action-bar button { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+        .action-bar select { padding: 8px 12px; background: #1e252c; border: 1px solid #2d3640; border-radius: 8px; color: #e7e9ea; font-size: 13px; outline: none; }
+
+        /* 成绩册表格 */
+        .gradebook-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .gradebook-table th { padding: 10px 12px; background: #15191e; text-align: left; font-weight: 600; color: #8b98a5; border-bottom: 1px solid #2d3640; position: sticky; top: 0; }
+        .gradebook-table td { padding: 8px 12px; border-bottom: 1px solid #1e252c; }
+        .gradebook-table tr:hover td { background: rgba(29, 155, 240, 0.05); }
+        .score-high { color: #00ba7c; font-weight: 600; }
+        .score-mid { color: #ffb800; }
+        .score-low { color: #f4212e; font-weight: 600; }
+
+        @media (max-width: 1024px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .grid-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="analytics-header">
+        <div class="class-selector">
+            <h1>📊 班级学情看板</h1>
+            <select id="classSelect" onchange="switchClass()">
+                <option value="">选择班级...</option>
+            </select>
+        </div>
+        <div class="nav-links">
+            <a href="/teacher-dashboard">📈 教师面板</a>
+            <a href="/homework">📝 作业管理</a>
+            <a href="/classes">🏫 班级列表</a>
+        </div>
+    </div>
+
+    <div class="analytics-body">
+        <!-- 学业危机预警 -->
+        <div class="alerts-panel">
+            <div class="section-title"><span class="icon">🚨</span> 学业危机预警</div>
+            <div class="alert-list" id="alertList">
+                <div class="empty-msg">暂无预警</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <!-- 代码活跃度热力图 -->
+            <div class="card">
+                <div class="section-title"><span class="icon">🟩</span> 代码活跃度雷达 (Commit Matrix)</div>
+                <div class="heatmap-container" id="heatmapContainer">
+                    <div class="empty-msg">选择班级后显示</div>
+                </div>
+                <div class="heatmap-legend">
+                    <span>少</span>
+                    <div class="heatmap-cell"></div>
+                    <div class="heatmap-cell l1"></div>
+                    <div class="heatmap-cell l2"></div>
+                    <div class="heatmap-cell l3"></div>
+                    <div class="heatmap-cell l4"></div>
+                    <span>多</span>
+                </div>
+            </div>
+
+            <!-- 成绩册摘要 -->
+            <div class="card">
+                <div class="section-title"><span class="icon">📋</span> 成绩册排行</div>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table class="gradebook-table" id="gradebookTable">
+                        <thead><tr><th>排名</th><th>学生</th><th>加权平均</th><th>条目数</th></tr></thead>
+                        <tbody id="gradebookBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 学生能力全景画像 -->
+        <div class="card" style="margin-bottom: 24px;">
+            <div class="section-title"><span class="icon">🎯</span> 学生能力全景画像 (五维雷达图)</div>
+            <div class="radar-container" id="radarContainer">
+                <div class="empty-msg">选择班级后显示</div>
+            </div>
+        </div>
+
+        <!-- 动态分组引擎 -->
+        <div class="card">
+            <div class="section-title"><span class="icon">👥</span> 动态分组引擎</div>
+            <div class="action-bar">
+                <select id="groupStrategy">
+                    <option value="heterogeneous">组内异质、组间同质</option>
+                    <option value="homogeneous">同质分组（水平相近）</option>
+                </select>
+                <select id="groupCount">
+                    <option value="4">4 组</option>
+                    <option value="5">5 组</option>
+                    <option value="6">6 组</option>
+                    <option value="3">3 组</option>
+                </select>
+                <button class="btn-sm-primary" onclick="autoGenGroups()">⚡ 智能分组</button>
+                <button class="btn-sm-resolve" onclick="loadGroups()">🔄 刷新</button>
+            </div>
+            <div class="groups-panel" id="groupsPanel">
+                <div class="empty-msg">暂无分组，点击"智能分组"一键生成</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentClassId = null;
+        const params = new URLSearchParams(location.search);
+        currentClassId = params.get('classId') ? parseInt(params.get('classId')) : null;
+
+        async function apiCall(url, options = {}) {
+            const token = localStorage.getItem('token') || document.cookie.match(/token=([^;]+)/)?.[1];
+            const res = await fetch(url, {
+                ...options,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...options.headers }
+            });
+            return res.json();
+        }
+
+        // 初始化
+        async function init() {
+            // 加载班级列表
+            const data = await apiCall('/api/classes/my');
+            const select = document.getElementById('classSelect');
+            (data.classes || []).forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                if (c.id === currentClassId) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            if (currentClassId) loadAll();
+        }
+
+        function switchClass() {
+            currentClassId = parseInt(document.getElementById('classSelect').value);
+            if (currentClassId) {
+                history.replaceState(null, '', `?classId=${currentClassId}`);
+                loadAll();
+            }
+        }
+
+        async function loadAll() {
+            if (!currentClassId) return;
+            await Promise.all([loadAlerts(), loadHeatmap(), loadAbilityProfiles(), loadGradebook(), loadGroups()]);
+        }
+
+        // ==================== 预警 ====================
+        async function loadAlerts() {
+            const data = await apiCall(`/api/class-analytics/${currentClassId}/risk-alerts`);
+            const list = document.getElementById('alertList');
+
+            if (!data.alerts || data.alerts.length === 0) {
+                list.innerHTML = '<div class="empty-msg">✅ 当前无学业预警，所有学生状态正常</div>';
+                return;
+            }
+
+            list.innerHTML = data.alerts.map(a => `
+                <div class="alert-item ${a.severity}">
+                    <div class="alert-avatar">${(a.student_name || '?')[0]}</div>
+                    <div class="alert-info">
+                        <div class="student">${a.student_name}</div>
+                        <div class="detail">${a.detail}</div>
+                    </div>
+                    <div class="alert-actions">
+                        <button class="btn-sm-primary" onclick="notifyStudent(${a.id})">📢 催交</button>
+                        <button class="btn-sm-resolve" onclick="resolveAlert(${a.id})">✓ 已处理</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function notifyStudent(alertId) {
+            const msg = prompt('发送催交/约谈通知（可修改）：', '老师关注到您近期学习状态有所下滑，请及时调整。如需帮助请联系老师。');
+            if (!msg) return;
+            await apiCall(`/api/class-analytics/${currentClassId}/risk-alerts/${alertId}/notify`, {
+                method: 'POST', body: JSON.stringify({ message: msg })
+            });
+            alert('通知已发送');
+        }
+
+        async function resolveAlert(alertId) {
+            await apiCall(`/api/class-analytics/${currentClassId}/risk-alerts/${alertId}/resolve`, { method: 'POST' });
+            loadAlerts();
+        }
+
+        // ==================== 热力图 ====================
+        async function loadHeatmap() {
+            const data = await apiCall(`/api/class-analytics/${currentClassId}/activity-heatmap?days=30`);
+            const container = document.getElementById('heatmapContainer');
+
+            if (!data.heatmap || data.heatmap.length === 0) {
+                container.innerHTML = '<div class="empty-msg">暂无活跃度数据</div>';
+                return;
+            }
+
+            // 生成日期列（最近30天）
+            const days = [];
+            for (let i = 29; i >= 0; i--) {
+                const d = new Date(); d.setDate(d.getDate() - i);
+                days.push(d.toISOString().split('T')[0]);
+            }
+
+            container.innerHTML = data.heatmap.map(student => {
+                const cells = days.map(day => {
+                    const info = student.days[day];
+                    const lines = info ? info.lines : 0;
+                    const level = lines === 0 ? '' : lines < 20 ? 'l1' : lines < 50 ? 'l2' : lines < 100 ? 'l3' : 'l4';
+                    return `<div class="heatmap-cell ${level}" title="${day}: ${lines}行"></div>`;
+                }).join('');
+                return `<div class="heatmap-row"><span class="label">${student.username}</span>${cells}</div>`;
+            }).join('');
+        }
+
+        // ==================== 能力雷达 ====================
+        async function loadAbilityProfiles() {
+            const data = await apiCall(`/api/class-analytics/${currentClassId}/ability-profiles`);
+            const container = document.getElementById('radarContainer');
+
+            if (!data.profiles || data.profiles.length === 0) {
+                container.innerHTML = '<div class="empty-msg">暂无能力画像数据（系统将根据作业成绩自动生成）</div>';
+                return;
+            }
+
+            container.innerHTML = data.profiles.map(p => {
+                const dims = [p.ui_design, p.logic_design, p.code_quality, p.delivery_speed, p.creativity];
+                const labels = ['美观', '逻辑', '规范', '时效', '创新'];
+                return `
+                    <div class="radar-card">
+                        <div class="student-name">${p.username}</div>
+                        ${renderRadarSVG(dims, labels)}
+                        <div class="radar-values">
+                            ${labels.map((l, i) => `<span>${l}:${dims[i]}</span>`).join('')}
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function renderRadarSVG(values, labels) {
+            const cx = 75, cy = 75, r = 55;
+            const n = values.length;
+            const angleStep = (2 * Math.PI) / n;
+
+            // 背景网格
+            let gridLines = '';
+            for (let level = 0.25; level <= 1; level += 0.25) {
+                const points = [];
+                for (let i = 0; i < n; i++) {
+                    const angle = i * angleStep - Math.PI / 2;
+                    points.push(`${cx + r * level * Math.cos(angle)},${cy + r * level * Math.sin(angle)}`);
+                }
+                gridLines += `<polygon points="${points.join(' ')}" fill="none" stroke="#2d3640" stroke-width="0.5"/>`;
+            }
+
+            // 轴线
+            let axes = '';
+            for (let i = 0; i < n; i++) {
+                const angle = i * angleStep - Math.PI / 2;
+                axes += `<line x1="${cx}" y1="${cy}" x2="${cx + r * Math.cos(angle)}" y2="${cy + r * Math.sin(angle)}" stroke="#2d3640" stroke-width="0.5"/>`;
+            }
+
+            // 数据多边形
+            const dataPoints = values.map((v, i) => {
+                const angle = i * angleStep - Math.PI / 2;
+                const dist = (v / 100) * r;
+                return `${cx + dist * Math.cos(angle)},${cy + dist * Math.sin(angle)}`;
+            });
+
+            return `<div class="radar-visual"><svg viewBox="0 0 150 150">
+                ${gridLines}${axes}
+                <polygon points="${dataPoints.join(' ')}" fill="rgba(29, 155, 240, 0.2)" stroke="#1d9bf0" stroke-width="1.5"/>
+                ${dataPoints.map((p, i) => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="3" fill="#1d9bf0"/>`).join('')}
+            </svg></div>`;
+        }
+
+        // ==================== 成绩册 ====================
+        async function loadGradebook() {
+            const data = await apiCall(`/api/class-analytics/${currentClassId}/gradebook`);
+            const tbody = document.getElementById('gradebookBody');
+
+            if (!data.summary || data.summary.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#8b98a5;">暂无成绩数据</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.summary.map((s, i) => {
+                const scoreClass = s.weighted_avg >= 80 ? 'score-high' : s.weighted_avg >= 60 ? 'score-mid' : 'score-low';
+                return `<tr>
+                    <td>${i + 1}</td>
+                    <td>${s.student_name}</td>
+                    <td class="${scoreClass}">${s.weighted_avg}%</td>
+                    <td>${s.entry_count}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // ==================== 分组 ====================
+        async function loadGroups() {
+            const data = await apiCall(`/api/class-analytics/${currentClassId}/groups`);
+            const panel = document.getElementById('groupsPanel');
+
+            if (!data.groups || data.groups.length === 0) {
+                panel.innerHTML = '<div class="empty-msg">暂无分组，点击"智能分组"一键生成</div>';
+                return;
+            }
+
+            panel.innerHTML = data.groups.map(g => `
+                <div class="group-card">
+                    <h4>${g.name} (${g.members.length}人)</h4>
+                    ${g.members.map(m => `
+                        <div class="member">
+                            <span>${m.username}</span>
+                            ${m.role === 'leader' ? '<span class="role-badge">组长</span>' : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+
+        async function autoGenGroups() {
+            const strategy = document.getElementById('groupStrategy').value;
+            const groupCount = parseInt(document.getElementById('groupCount').value);
+
+            const data = await apiCall(`/api/class-analytics/${currentClassId}/groups/auto-generate`, {
+                method: 'POST',
+                body: JSON.stringify({ strategy, groupCount })
+            });
+
+            if (data.success) {
+                alert(`已完成智能分组：${data.groupCount}组，共${data.totalStudents}名学生`);
+                loadGroups();
+            } else {
+                alert(data.error || '分组失败');
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

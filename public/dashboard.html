@@ -7,6 +7,39 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+    <style>
+        .learning-overview{margin-bottom:32px}
+        .learning-overview h2{font-size:1.3rem;font-weight:700;margin-bottom:16px;color:var(--text-primary,#fff)}
+        .learning-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+        .learning-card{background:var(--bg-card,#1e1e2e);border:1px solid var(--border,#2d2d3d);border-radius:12px;padding:20px}
+        .learning-card h3{font-size:.95rem;font-weight:600;color:var(--text-secondary,#a0aec0);margin-bottom:14px}
+        .hw-ring-container{position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+        .hw-ring-center{position:absolute;font-size:1.4rem;font-weight:700;color:var(--primary-light,#a5b4fc)}
+        .hw-stats-list{display:flex;flex-wrap:wrap;gap:8px}
+        .hw-stat-item{font-size:.78rem;padding:4px 10px;border-radius:999px;font-weight:600}
+        .hw-stat-pending{background:rgba(234,179,8,.12);color:#eab308}
+        .hw-stat-submitted{background:rgba(59,130,246,.12);color:#60a5fa}
+        .hw-stat-graded{background:rgba(34,197,94,.12);color:#4ade80}
+        .hw-stat-overdue{background:rgba(239,68,68,.12);color:#f87171}
+        .grades-list{max-height:220px;overflow-y:auto}
+        .grade-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+        .grade-item:last-child{border-bottom:none}
+        .grade-info{flex:1;min-width:0}
+        .grade-title{font-size:.85rem;font-weight:600;color:var(--text-primary,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .grade-class{font-size:.72rem;color:var(--text-muted,#666)}
+        .grade-score{font-size:1rem;font-weight:700;padding:4px 10px;border-radius:8px;min-width:55px;text-align:center}
+        .grade-high{background:rgba(34,197,94,.12);color:#4ade80}
+        .grade-mid{background:rgba(234,179,8,.12);color:#eab308}
+        .grade-low{background:rgba(239,68,68,.12);color:#f87171}
+        .announcements-list{max-height:220px;overflow-y:auto}
+        .ann-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+        .ann-item:last-child{border-bottom:none}
+        .ann-title{font-size:.88rem;font-weight:600;color:var(--text-primary,#fff);margin-bottom:4px}
+        .ann-title .priority-urgent{color:#f87171;margin-right:4px}
+        .ann-meta{font-size:.72rem;color:var(--text-muted,#666)}
+        .ann-content{font-size:.8rem;color:var(--text-secondary,#a0aec0);margin-top:4px;line-height:1.5}
+        .empty-learning{text-align:center;padding:20px;color:var(--text-muted,#666);font-size:.85rem}
+    </style>
 </head>
 <body>
     <div class="dashboard">
@@ -19,15 +52,16 @@
                 </a>
                 <nav class="dash-nav">
                     <a href="/dashboard" class="active">我的项目</a>
+                    <a href="/homework">作业中心</a>
+                    <a href="/classes">班级管理</a>
                     <a href="/templates">模板商城</a>
                     <a href="/community">社区广场</a>
-                    <a href="/leaderboard">排行榜</a>
-                    <a href="/docs">文档</a>
                     <a href="/chat" style="position:relative" id="chatNavLink">💬<span id="chatBadge" style="position:absolute;top:-6px;right:-10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:.6rem;font-weight:700;line-height:16px;text-align:center;display:none"></span></a>
                 </nav>
                 <div class="dash-user" id="dashUser">
                     <div class="dash-user-avatar" id="userAvatar">?</div>
                     <span class="dash-user-name" id="userName">加载中...</span>
+                    <span id="userRoleBadge"></span>
                     <button class="btn-logout" onclick="logout()">退出</button>
                 </div>
             </div>
@@ -55,6 +89,29 @@
                 <div class="stat-card">
                     <div class="stat-label">🪙 金币</div>
                     <div class="stat-value" id="statCoins" style="-webkit-text-fill-color:#eab308;">0</div>
+                </div>
+            </div>
+
+            <!-- 学习概览（学生角色显示）-->
+            <div class="learning-overview" id="learningOverview" style="display:none">
+                <h2>📖 学习概览</h2>
+                <div class="learning-grid" id="learningGrid">
+                    <div class="learning-card hw-stats">
+                        <h3>作业进度</h3>
+                        <div class="hw-ring-container">
+                            <canvas id="hwRingChart" width="120" height="120"></canvas>
+                            <div class="hw-ring-center" id="hwRingCenter">0%</div>
+                        </div>
+                        <div class="hw-stats-list" id="hwStatsList"></div>
+                    </div>
+                    <div class="learning-card recent-grades">
+                        <h3>最近成绩</h3>
+                        <div id="recentGradesList" class="grades-list"></div>
+                    </div>
+                    <div class="learning-card announcements-card">
+                        <h3>📢 班级公告</h3>
+                        <div id="announcementsList" class="announcements-list"></div>
+                    </div>
                 </div>
             </div>
 
@@ -93,9 +150,24 @@
                             <input type="text" id="projectDesc" class="form-input" placeholder="简单介绍一下你的项目">
                         </div>
                         <div class="form-group">
+                            <label for="schoolLevel">学段</label>
+                            <select id="schoolLevel" class="form-input" onchange="updateSubjectOptions()">
+                                <option value="">-- 请选择学段 --</option>
+                                <option value="elementary">小学</option>
+                                <option value="middle">初中</option>
+                                <option value="high">高中</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="subjectSelect">学科</label>
+                            <select id="subjectSelect" class="form-input">
+                                <option value="">-- 请先选择学段 --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label class="form-checkbox">
                                 <input type="checkbox" id="projectPublic">
-                                <span>公开到社区广场</span>
+                                <span>共享到平台（公开展示）</span>
                             </label>
                         </div>
                     </div>
@@ -154,6 +226,23 @@
         let currentUser = null;
         let selectedFile = null;
 
+        const SUBJECTS = {
+            elementary: ['语文', '数学', '英语', '科学', '道德与法治', '音乐', '美术', '体育', '信息技术'],
+            middle: ['语文', '数学', '英语', '物理', '化学', '道德与法治', '历史', '地理', '生物', '信息技术'],
+            high: ['语文', '数学', '英语', '物理', '化学', '生物', '政治', '历史', '地理', '信息技术', '通用技术']
+        };
+
+        function updateSubjectOptions() {
+            const level = document.getElementById('schoolLevel').value;
+            const select = document.getElementById('subjectSelect');
+            select.innerHTML = '<option value="">-- 请选择学科 --</option>';
+            if (SUBJECTS[level]) {
+                SUBJECTS[level].forEach(s => {
+                    select.innerHTML += `<option value="${s}">${s}</option>`;
+                });
+            }
+        }
+
         // 页面加载
         (async () => {
             currentUser = await checkAuth();
@@ -164,6 +253,10 @@
             renderUserInfo(currentUser);
             loadProjects();
             loadMyTemplates();
+            // 学生角色加载学习概览
+            if (currentUser.role === 'student') {
+                loadStudentOverview();
+            }
             // Load chat unread
             try {
                 const ud = await api('/api/chat/unread');
@@ -178,6 +271,7 @@
         function renderUserInfo(user) {
             document.getElementById('userAvatar').textContent = user.username[0].toUpperCase();
             document.getElementById('userName').textContent = user.username;
+            document.getElementById('userRoleBadge').innerHTML = getRoleBadge(user.role);
             document.getElementById('statProjects').textContent = user.project_count || 0;
             document.getElementById('statVisits').textContent = user.total_visits || 0;
             document.getElementById('statStorage').innerHTML = formatSize(user.total_storage || 0);
@@ -194,6 +288,13 @@
                     link.textContent = '👑 管理后台';
                     nav.appendChild(link);
                 }
+            }
+            // 学生角色隐藏学段/学科选择（仅教师和管理员可上传到学科课件）
+            if (user.role === 'student' || user.role === 'user') {
+                const levelGroup = document.getElementById('schoolLevel')?.closest('.form-group');
+                const subjectGroup = document.getElementById('subjectSelect')?.closest('.form-group');
+                if (levelGroup) levelGroup.style.display = 'none';
+                if (subjectGroup) subjectGroup.style.display = 'none';
             }
         }
 
@@ -273,6 +374,8 @@
             formData.append('slug', document.getElementById('projectSlug').value);
             formData.append('description', document.getElementById('projectDesc').value);
             formData.append('isPublic', document.getElementById('projectPublic').checked);
+            formData.append('schoolLevel', document.getElementById('schoolLevel').value);
+            formData.append('subject', document.getElementById('subjectSelect').value);
 
             try {
                 // 模拟进度
@@ -360,7 +463,8 @@
                         <span>📄 ${p.file_count} 个文件</span>
                         <span>💾 ${formatSize(p.total_size)}</span>
                         <span>👀 ${p.visit_count} 次访问</span>
-                        <span>${p.is_public ? '🌐 公开' : '🔒 私密'}</span>
+                        <span>${p.is_public ? '🌐 已共享' : '🔒 私密'}</span>
+                        ${p.subject ? `<span>📖 ${p.school_level === 'elementary' ? '小学' : '初中'} · ${p.subject}</span>` : ''}
                     </div>
                     <div class="project-meta">
                         <span>部署于 ${formatDate(p.deployed_at)}</span>
@@ -448,6 +552,103 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // ========== 学生学习概览 ==========
+        async function loadStudentOverview() {
+            try {
+                const data = await api('/api/classes/student/overview');
+                document.getElementById('learningOverview').style.display = '';
+                renderHwStats(data.homeworkStats);
+                renderRecentGrades(data.recentGrades);
+                renderAnnouncements(data.announcements);
+            } catch (e) {
+                console.error('学习概览加载失败:', e);
+            }
+        }
+
+        function renderHwStats(stats) {
+            const total = stats.total || 1;
+            const completedPct = Math.round(((stats.graded + stats.submitted) / total) * 100);
+
+            // Draw ring chart
+            const canvas = document.getElementById('hwRingChart');
+            const ctx = canvas.getContext('2d');
+            const cx = 60, cy = 60, r = 48, lw = 10;
+            ctx.clearRect(0, 0, 120, 120);
+
+            const segments = [
+                { val: stats.graded, color: '#4ade80' },
+                { val: stats.submitted, color: '#60a5fa' },
+                { val: stats.overdue, color: '#f87171' },
+                { val: stats.pending, color: '#eab308' }
+            ];
+
+            let startAngle = -Math.PI / 2;
+            segments.forEach(seg => {
+                if (seg.val <= 0) return;
+                const angle = (seg.val / total) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, startAngle, startAngle + angle);
+                ctx.strokeStyle = seg.color;
+                ctx.lineWidth = lw;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                startAngle += angle;
+            });
+
+            if (stats.total === 0) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255,255,255,.1)';
+                ctx.lineWidth = lw;
+                ctx.stroke();
+            }
+
+            document.getElementById('hwRingCenter').textContent = completedPct + '%';
+
+            document.getElementById('hwStatsList').innerHTML = `
+                <span class="hw-stat-item hw-stat-pending">待完成 ${stats.pending}</span>
+                <span class="hw-stat-item hw-stat-submitted">已提交 ${stats.submitted}</span>
+                <span class="hw-stat-item hw-stat-graded">已批改 ${stats.graded}</span>
+                ${stats.overdue > 0 ? `<span class="hw-stat-item hw-stat-overdue">已过期 ${stats.overdue}</span>` : ''}
+            `;
+        }
+
+        function renderRecentGrades(grades) {
+            const el = document.getElementById('recentGradesList');
+            if (!grades.length) {
+                el.innerHTML = '<div class="empty-learning">暂无成绩记录</div>';
+                return;
+            }
+            el.innerHTML = grades.map(g => {
+                const pct = Math.round((g.score / g.max_score) * 100);
+                const cls = pct >= 80 ? 'grade-high' : pct >= 60 ? 'grade-mid' : 'grade-low';
+                return `
+                    <div class="grade-item">
+                        <div class="grade-info">
+                            <div class="grade-title">${escapeHtml(g.homework_title)}</div>
+                            <div class="grade-class">${escapeHtml(g.class_name)}</div>
+                        </div>
+                        <div class="grade-score ${cls}">${g.score}/${g.max_score}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderAnnouncements(list) {
+            const el = document.getElementById('announcementsList');
+            if (!list.length) {
+                el.innerHTML = '<div class="empty-learning">暂无公告</div>';
+                return;
+            }
+            el.innerHTML = list.map(a => `
+                <div class="ann-item">
+                    <div class="ann-title">${a.priority === 'urgent' ? '<span class="priority-urgent">🔴</span>' : ''}${escapeHtml(a.title)}</div>
+                    <div class="ann-meta">${escapeHtml(a.teacher_name)} · ${escapeHtml(a.class_name)} · ${formatDate(a.created_at)}</div>
+                    ${a.content ? `<div class="ann-content">${escapeHtml(a.content).substring(0, 100)}</div>` : ''}
+                </div>
+            `).join('');
         }
     </script>
 </body>

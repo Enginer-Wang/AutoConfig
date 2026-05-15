@@ -87,6 +87,7 @@ router.post('/deploy', upload.single('file'), (req, res) => {
         }
 
         const { name, description, isPublic } = req.body;
+        let { schoolLevel, subject } = req.body;
         let slug = (req.body.slug || name || '').toLowerCase()
             .replace(/[^a-z0-9-]/g, '-')
             .replace(/-+/g, '-')
@@ -98,6 +99,12 @@ router.post('/deploy', upload.single('file'), (req, res) => {
 
         const db = getDb();
         const user = db.prepare('SELECT username FROM users WHERE id = ?').get(req.user.id);
+
+        // 权限控制：学生不能设置学科课件字段（仅教师/管理员可以）
+        if (req.user.role === 'student' || req.user.role === 'user') {
+            schoolLevel = '';
+            subject = '';
+        }
 
         // 部署目录
         const siteDir = path.join(SITES_DIR, user.username, slug);
@@ -230,16 +237,21 @@ li{margin:10px 0;font-size:1.1rem}</style></head>
             db.prepare(`
                 UPDATE projects SET 
                     name = ?, description = ?, is_public = ?,
+                    school_level = ?, subject = ?,
                     file_count = ?, total_size = ?,
                     deployed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `).run(name || slug, description || '', isPublic === 'true' ? 1 : 0, fileCount, totalSize, existing.id);
+            `).run(name || slug, description || '', isPublic === 'true' ? 1 : 0,
+                schoolLevel || '', subject || '',
+                fileCount, totalSize, existing.id);
             projectId = existing.id;
         } else {
             const result = db.prepare(`
-                INSERT INTO projects (user_id, name, slug, description, is_public, file_count, total_size)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `).run(req.user.id, name || slug, slug, description || '', isPublic === 'true' ? 1 : 0, fileCount, totalSize);
+                INSERT INTO projects (user_id, name, slug, description, is_public, school_level, subject, file_count, total_size)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(req.user.id, name || slug, slug, description || '', isPublic === 'true' ? 1 : 0,
+                schoolLevel || '', subject || '',
+                fileCount, totalSize);
             projectId = result.lastInsertRowid;
         }
 
@@ -263,7 +275,7 @@ li{margin:10px 0;font-size:1.1rem}</style></head>
 
 // 更新项目信息
 router.put('/:id', (req, res) => {
-    const { name, description, isPublic } = req.body;
+    const { name, description, isPublic, schoolLevel, subject } = req.body;
     const db = getDb();
 
     const project = db.prepare(
@@ -275,12 +287,16 @@ router.put('/:id', (req, res) => {
     }
 
     db.prepare(`
-        UPDATE projects SET name = ?, description = ?, is_public = ?, updated_at = CURRENT_TIMESTAMP
+        UPDATE projects SET name = ?, description = ?, is_public = ?, 
+            school_level = ?, subject = ?,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     `).run(
         name || project.name,
         description !== undefined ? description : project.description,
         isPublic !== undefined ? (isPublic ? 1 : 0) : project.is_public,
+        schoolLevel !== undefined ? schoolLevel : (project.school_level || ''),
+        subject !== undefined ? subject : (project.subject || ''),
         req.params.id
     );
 
@@ -325,7 +341,7 @@ router.delete('/:id', (req, res) => {
 // 从编辑器部署（无需 ZIP，直接传文件内容）
 router.post('/deploy-template', (req, res) => {
     try {
-        const { name, slug: rawSlug, description, isPublic, files } = req.body;
+        const { name, slug: rawSlug, description, isPublic, files, schoolLevel, subject } = req.body;
         if (!files || !files['index.html']) {
             return res.status(400).json({ error: '缺少 index.html' });
         }
@@ -363,16 +379,21 @@ router.post('/deploy-template', (req, res) => {
         if (existing) {
             db.prepare(`
                 UPDATE projects SET name = ?, description = ?, is_public = ?,
+                    school_level = ?, subject = ?,
                     file_count = ?, total_size = ?,
                     deployed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            `).run(name || slug, description || '', isPublic ? 1 : 0, fileCount, totalSize, existing.id);
+            `).run(name || slug, description || '', isPublic ? 1 : 0,
+                schoolLevel || '', subject || '',
+                fileCount, totalSize, existing.id);
             projectId = existing.id;
         } else {
             const result = db.prepare(`
-                INSERT INTO projects (user_id, name, slug, description, is_public, file_count, total_size)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `).run(req.user.id, name || slug, slug, description || '', isPublic ? 1 : 0, fileCount, totalSize);
+                INSERT INTO projects (user_id, name, slug, description, is_public, school_level, subject, file_count, total_size)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(req.user.id, name || slug, slug, description || '', isPublic ? 1 : 0,
+                schoolLevel || '', subject || '',
+                fileCount, totalSize);
             projectId = result.lastInsertRowid;
         }
 
@@ -419,17 +440,13 @@ router.get('/:id/source', (req, res) => {
     const siteDir = path.join(SITES_DIR, project.username, project.slug);
     const result = { html: '', css: '', js: '' };
 
-    // 读取 index.html
     const htmlPath = path.join(siteDir, 'index.html');
     if (fs.existsSync(htmlPath)) result.html = fs.readFileSync(htmlPath, 'utf-8');
-    // 读取 style.css
     const cssPath = path.join(siteDir, 'style.css');
     if (fs.existsSync(cssPath)) result.css = fs.readFileSync(cssPath, 'utf-8');
-    // 读取 script.js
     const jsPath = path.join(siteDir, 'script.js');
     if (fs.existsSync(jsPath)) result.js = fs.readFileSync(jsPath, 'utf-8');
 
-    // 如果没有 style.css/script.js 但有其他同类型文件
     if (!result.css) {
         const cssFiles = fs.existsSync(siteDir) ? fs.readdirSync(siteDir).filter(f => f.endsWith('.css')) : [];
         if (cssFiles.length > 0) result.css = fs.readFileSync(path.join(siteDir, cssFiles[0]), 'utf-8');
@@ -445,6 +462,103 @@ router.get('/:id/source', (req, res) => {
     }
 
     res.json({ project, source: result });
+});
+
+// 下载项目为 ZIP（公开项目任何人可下载，私有仅作者/管理员）
+router.get('/:id/download', (req, res) => {
+    const db = getDb();
+    const project = db.prepare(
+        'SELECT p.*, u.username FROM projects p JOIN users u ON p.user_id = u.id WHERE p.id = ?'
+    ).get(req.params.id);
+
+    if (!project) return res.status(404).json({ error: '项目不存在' });
+
+    const currentUser = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.id);
+    const isOwner = project.user_id === req.user.id;
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    if (!project.is_public && !isOwner && !isAdmin) {
+        return res.status(403).json({ error: '该项目未公开，无权下载' });
+    }
+
+    const siteDir = path.join(SITES_DIR, project.username, project.slug);
+    if (!fs.existsSync(siteDir)) return res.status(404).json({ error: '项目文件不存在' });
+
+    try {
+        const zip = new AdmZip();
+        zip.addLocalFolder(siteDir);
+        const buffer = zip.toBuffer();
+        const fileName = `${project.slug}.zip`;
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+        res.send(buffer);
+    } catch (err) {
+        console.error('打包下载失败:', err);
+        res.status(500).json({ error: '打包失败: ' + err.message });
+    }
+});
+
+// 克隆/复制公开项目到当前用户（用于"编辑"功能）
+router.post('/:id/clone', (req, res) => {
+    const db = getDb();
+    const source = db.prepare(
+        'SELECT p.*, u.username FROM projects p JOIN users u ON p.user_id = u.id WHERE p.id = ?'
+    ).get(req.params.id);
+    if (!source) return res.status(404).json({ error: '项目不存在' });
+
+    const currentUser = db.prepare('SELECT role, username FROM users WHERE id = ?').get(req.user.id);
+    const isOwner = source.user_id === req.user.id;
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    if (!source.is_public && !isOwner && !isAdmin) {
+        return res.status(403).json({ error: '该项目未公开，无权复制' });
+    }
+
+    const sourceDir = path.join(SITES_DIR, source.username, source.slug);
+    if (!fs.existsSync(sourceDir)) return res.status(404).json({ error: '源项目文件不存在' });
+
+    // 生成不冲突的 slug
+    let baseSlug = source.slug + '-copy';
+    let newSlug = baseSlug;
+    let i = 1;
+    while (db.prepare('SELECT id FROM projects WHERE user_id = ? AND slug = ?').get(req.user.id, newSlug)) {
+        i++;
+        newSlug = `${baseSlug}-${i}`;
+    }
+
+    const targetDir = path.join(SITES_DIR, currentUser.username, newSlug);
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    // 递归复制
+    function copyRec(src, dst) {
+        for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+            const sp = path.join(src, entry.name);
+            const dp = path.join(dst, entry.name);
+            if (entry.isDirectory()) {
+                fs.mkdirSync(dp, { recursive: true });
+                copyRec(sp, dp);
+            } else {
+                fs.copyFileSync(sp, dp);
+            }
+        }
+    }
+    copyRec(sourceDir, targetDir);
+
+    const result = db.prepare(`
+        INSERT INTO projects (user_id, name, slug, description, is_public, school_level, subject, file_count, total_size)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        req.user.id,
+        source.name + ' (副本)',
+        newSlug,
+        '从 ' + source.username + '/' + source.slug + ' 复制',
+        0,
+        source.school_level || '',
+        source.subject || '',
+        source.file_count || 0,
+        source.total_size || 0
+    );
+
+    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(result.lastInsertRowid);
+    res.json({ success: true, project, editUrl: `/edit-project/${project.id}` });
 });
 
 module.exports = router;

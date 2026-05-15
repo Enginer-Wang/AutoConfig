@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教师数据大屏 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+    <style>
+        .td-container{max-width:1400px;margin:0 auto;padding:24px 20px}
+        .td-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+        .td-title{font-size:1.5rem;font-weight:700;color:var(--text-primary,#fff)}
+        .td-class-select{background:var(--bg-card,#1e1e2e);border:1px solid var(--border,#2d2d3d);border-radius:8px;padding:8px 14px;color:var(--text-primary,#fff);font-size:.85rem}
+        .td-stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+        .td-stat{background:var(--bg-card,#1e1e2e);border:1px solid var(--border,#2d2d3d);border-radius:12px;padding:18px;text-align:center}
+        .td-stat-value{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#818cf8,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .td-stat-label{font-size:.78rem;color:var(--text-muted,#666);margin-top:4px}
+        .td-stat.alert .td-stat-value{background:linear-gradient(135deg,#f87171,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .td-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;margin-bottom:24px}
+        .td-card{background:var(--bg-card,#1e1e2e);border:1px solid var(--border,#2d2d3d);border-radius:12px;padding:20px}
+        .td-card h3{font-size:1rem;font-weight:700;color:var(--text-primary,#fff);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+        .td-card h3 .icon{font-size:1.1rem}
+        .funnel-bar{display:flex;align-items:center;margin-bottom:10px;gap:10px}
+        .funnel-label{font-size:.78rem;color:var(--text-secondary,#a0aec0);min-width:70px}
+        .funnel-track{flex:1;height:26px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden;position:relative}
+        .funnel-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:.7rem;font-weight:700;color:#fff;min-width:fit-content;transition:width .5s}
+        .funnel-fill.not-submitted{background:linear-gradient(90deg,#6b7280,#9ca3af)}
+        .funnel-fill.submitted{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+        .funnel-fill.graded{background:linear-gradient(90deg,#22c55e,#4ade80)}
+        .funnel-fill.rejected{background:linear-gradient(90deg,#ef4444,#f87171)}
+        .funnel-count{font-size:.78rem;color:var(--text-muted,#666);min-width:40px;text-align:right}
+        .dist-chart{display:flex;align-items:flex-end;gap:6px;height:160px;padding:10px 0}
+        .dist-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
+        .dist-bar{width:100%;border-radius:4px 4px 0 0;transition:height .5s;min-height:4px}
+        .dist-bar-label{font-size:.65rem;color:var(--text-muted,#666);margin-top:6px;text-align:center}
+        .dist-bar-count{font-size:.7rem;color:var(--text-secondary,#a0aec0);margin-bottom:4px;font-weight:600}
+        .dist-bar.s90{background:linear-gradient(180deg,#22c55e,#16a34a)}
+        .dist-bar.s80{background:linear-gradient(180deg,#3b82f6,#2563eb)}
+        .dist-bar.s70{background:linear-gradient(180deg,#eab308,#ca8a04)}
+        .dist-bar.s60{background:linear-gradient(180deg,#f97316,#ea580c)}
+        .dist-bar.s50{background:linear-gradient(180deg,#ef4444,#dc2626)}
+        .dist-bar.s0{background:linear-gradient(180deg,#6b7280,#4b5563)}
+        .alert-list{max-height:320px;overflow-y:auto}
+        .alert-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:8px;margin-bottom:8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05)}
+        .alert-item.high{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05)}
+        .alert-item.medium{border-color:rgba(234,179,8,.3);background:rgba(234,179,8,.05)}
+        .alert-avatar{width:36px;height:36px;border-radius:50%;background:var(--bg-input,#2d2d3d);display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:var(--text-secondary,#a0aec0)}
+        .alert-info{flex:1}
+        .alert-name{font-size:.85rem;font-weight:600;color:var(--text-primary,#fff)}
+        .alert-reasons{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+        .alert-tag{font-size:.68rem;padding:2px 8px;border-radius:999px;font-weight:600}
+        .alert-tag.high{background:rgba(239,68,68,.15);color:#f87171}
+        .alert-tag.medium{background:rgba(234,179,8,.15);color:#eab308}
+        .mastery-list{max-height:320px;overflow-y:auto}
+        .mastery-item{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+        .mastery-item:last-child{border-bottom:none}
+        .mastery-topic{flex:1;font-size:.82rem;color:var(--text-primary,#fff);font-weight:500}
+        .mastery-bar-wrap{flex:2;height:8px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
+        .mastery-bar-fill{height:100%;border-radius:4px;transition:width .5s}
+        .mastery-pct{font-size:.75rem;font-weight:700;min-width:42px;text-align:right}
+        .mastery-pct.high{color:#4ade80}
+        .mastery-pct.mid{color:#eab308}
+        .mastery-pct.low{color:#f87171}
+        .trend-chart{display:flex;align-items:flex-end;gap:8px;height:120px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+        .trend-point{display:flex;flex-direction:column;align-items:center;flex:1}
+        .trend-bar{width:20px;border-radius:4px 4px 0 0;background:linear-gradient(180deg,#818cf8,#6366f1);transition:height .5s}
+        .trend-label{font-size:.6rem;color:var(--text-muted,#666);margin-top:6px;text-align:center;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .trend-value{font-size:.65rem;color:var(--text-secondary,#a0aec0);margin-bottom:4px;font-weight:600}
+        .empty-state{text-align:center;padding:30px;color:var(--text-muted,#666);font-size:.85rem}
+        .td-full{grid-column:1/-1}
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="dash-header">
+            <div class="dash-header-inner">
+                <a href="/" class="dash-logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">Autoconfig</span>
+                </a>
+                <nav class="dash-nav">
+                    <a href="/dashboard">我的项目</a>
+                    <a href="/homework">作业中心</a>
+                    <a href="/classes">班级管理</a>
+                    <a href="/teacher-dashboard" class="active">数据大屏</a>
+                    <a href="/community">社区广场</a>
+                </nav>
+                <div class="dash-user" id="dashUser">
+                    <div class="dash-user-avatar" id="userAvatar">?</div>
+                    <span class="dash-user-name" id="userName">加载中...</span>
+                    <button class="btn-logout" onclick="logout()">退出</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="td-container">
+            <div class="td-header">
+                <h1 class="td-title">📊 教师数据大屏</h1>
+                <select class="td-class-select" id="classSelect" onchange="loadDashboard()">
+                    <option value="">全部班级</option>
+                </select>
+            </div>
+
+            <!-- 统计概览 -->
+            <div class="td-stats-row" id="statsRow">
+                <div class="td-stat"><div class="td-stat-value" id="statClasses">0</div><div class="td-stat-label">管理班级</div></div>
+                <div class="td-stat"><div class="td-stat-value" id="statStudents">0</div><div class="td-stat-label">总学生数</div></div>
+                <div class="td-stat"><div class="td-stat-value" id="statPending">0</div><div class="td-stat-label">待批改</div></div>
+                <div class="td-stat"><div class="td-stat-value" id="statToday">0</div><div class="td-stat-label">今日提交</div></div>
+                <div class="td-stat alert"><div class="td-stat-value" id="statAlerts">0</div><div class="td-stat-label">预警学生</div></div>
+            </div>
+
+            <!-- 数据面板 -->
+            <div class="td-grid">
+                <!-- 作业完成度漏斗 -->
+                <div class="td-card">
+                    <h3><span class="icon">📝</span> 作业完成度漏斗</h3>
+                    <div id="funnelChart"><div class="empty-state">加载中...</div></div>
+                </div>
+
+                <!-- 成绩正态分布 -->
+                <div class="td-card">
+                    <h3><span class="icon">📈</span> 成绩分布直方图</h3>
+                    <div id="distChart"><div class="empty-state">加载中...</div></div>
+                </div>
+
+                <!-- 学生预警 -->
+                <div class="td-card">
+                    <h3><span class="icon">⚠️</span> 学生预警</h3>
+                    <div class="alert-list" id="alertList"><div class="empty-state">加载中...</div></div>
+                </div>
+
+                <!-- 知识点掌握度 -->
+                <div class="td-card">
+                    <h3><span class="icon">🎯</span> 知识点掌握度</h3>
+                    <div class="mastery-list" id="masteryList"><div class="empty-state">加载中...</div></div>
+                </div>
+
+                <!-- 成绩趋势（全宽） -->
+                <div class="td-card td-full">
+                    <h3><span class="icon">📉</span> 全班平均分趋势</h3>
+                    <div id="trendChart"><div class="empty-state">加载中...</div></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+    let currentUser = null;
+
+    async function init() {
+        currentUser = await checkAuth();
+        if (!currentUser) { location.href = '/login'; return; }
+        if (currentUser.role !== 'teacher' && currentUser.role !== 'admin') {
+            alert('该页面仅对教师开放');
+            location.href = '/dashboard';
+            return;
+        }
+        document.getElementById('userName').textContent = currentUser.username;
+        document.getElementById('userAvatar').textContent = currentUser.username[0].toUpperCase();
+        await loadOverview();
+        await loadDashboard();
+    }
+
+    async function loadOverview() {
+        try {
+            const res = await fetch('/api/dashboard/overview');
+            const data = await res.json();
+            document.getElementById('statClasses').textContent = data.stats.totalClasses;
+            document.getElementById('statStudents').textContent = data.stats.totalStudents;
+            document.getElementById('statPending').textContent = data.stats.pendingGrading;
+            document.getElementById('statToday').textContent = data.stats.todaySubmissions;
+            document.getElementById('statAlerts').textContent = data.stats.alertCount;
+
+            // 填充班级下拉
+            const select = document.getElementById('classSelect');
+            select.innerHTML = '<option value="">全部班级</option>';
+            data.classes.forEach(c => {
+                select.innerHTML += `<option value="${c.id}">${c.name}${c.semester ? ' ('+c.semester+')' : ''}</option>`;
+            });
+
+            // 绘制趋势图
+            renderTrend(data.scoreTrend);
+        } catch(e) { console.error(e); }
+    }
+
+    async function loadDashboard() {
+        const classId = document.getElementById('classSelect').value;
+        await Promise.all([
+            loadFunnel(classId),
+            loadDistribution(classId),
+            loadAlerts(classId),
+            loadMastery(classId)
+        ]);
+    }
+
+    async function loadFunnel(classId) {
+        try {
+            const url = '/api/dashboard/homework-funnel' + (classId ? '?classId=' + classId : '');
+            const res = await fetch(url);
+            const data = await res.json();
+            const f = data.funnel;
+            const total = f.not_submitted + f.submitted + f.graded + f.rejected || 1;
+            document.getElementById('funnelChart').innerHTML = `
+                ${funnelBar('未提交', f.not_submitted, total, 'not-submitted')}
+                ${funnelBar('已提交', f.submitted, total, 'submitted')}
+                ${funnelBar('已批改', f.graded, total, 'graded')}
+                ${funnelBar('已打回', f.rejected, total, 'rejected')}
+            `;
+        } catch(e) {
+            document.getElementById('funnelChart').innerHTML = '<div class="empty-state">暂无数据</div>';
+        }
+    }
+
+    function funnelBar(label, count, total, cls) {
+        const pct = Math.round((count / total) * 100);
+        return `<div class="funnel-bar">
+            <span class="funnel-label">${label}</span>
+            <div class="funnel-track"><div class="funnel-fill ${cls}" style="width:${Math.max(pct, 2)}%">${pct}%</div></div>
+            <span class="funnel-count">${count}人</span>
+        </div>`;
+    }
+
+    async function loadDistribution(classId) {
+        try {
+            const url = '/api/dashboard/grade-distribution' + (classId ? '?classId=' + classId : '');
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (data.overview && data.overview.length > 0) {
+                // 从overview计算整体分布 - 展示各作业的平均分
+                const ranges = {'90-100': 0, '80-89': 0, '70-79': 0, '60-69': 0, '50-59': 0, '0-49': 0};
+                // 用第一个有数据的作业展示分布
+                const firstHw = data.overview[0];
+                if (firstHw) {
+                    const detailRes = await fetch('/api/dashboard/grade-distribution?homeworkId=' + firstHw.id);
+                    const detailData = await detailRes.json();
+                    if (detailData.distribution) {
+                        detailData.distribution.forEach(d => { ranges[d.range] = d.count; });
+                    }
+                    renderDistribution(ranges, detailData.stats);
+                    return;
+                }
+            }
+            document.getElementById('distChart').innerHTML = '<div class="empty-state">暂无成绩数据</div>';
+        } catch(e) {
+            document.getElementById('distChart').innerHTML = '<div class="empty-state">暂无成绩数据</div>';
+        }
+    }
+
+    function renderDistribution(ranges, stats) {
+        const maxCount = Math.max(...Object.values(ranges), 1);
+        const classes = {'90-100': 's90', '80-89': 's80', '70-79': 's70', '60-69': 's60', '50-59': 's50', '0-49': 's0'};
+        let html = '<div class="dist-chart">';
+        for (const [range, count] of Object.entries(ranges)) {
+            const h = Math.round((count / maxCount) * 130);
+            html += `<div class="dist-bar-wrap">
+                <span class="dist-bar-count">${count}</span>
+                <div class="dist-bar ${classes[range]}" style="height:${Math.max(h, 4)}px"></div>
+                <span class="dist-bar-label">${range}</span>
+            </div>`;
+        }
+        html += '</div>';
+        if (stats && stats.avg_score !== null) {
+            html += `<div style="display:flex;justify-content:space-around;margin-top:12px;font-size:.78rem;color:var(--text-secondary,#a0aec0)">
+                <span>最高: <b style="color:#4ade80">${stats.max_score}</b></span>
+                <span>平均: <b style="color:#60a5fa">${stats.avg_score}</b></span>
+                <span>最低: <b style="color:#f87171">${stats.min_score}</b></span>
+            </div>`;
+        }
+        document.getElementById('distChart').innerHTML = html;
+    }
+
+    async function loadAlerts(classId) {
+        if (!classId) {
+            document.getElementById('alertList').innerHTML = '<div class="empty-state">请选择班级查看预警</div>';
+            return;
+        }
+        try {
+            const res = await fetch('/api/dashboard/student-alerts?classId=' + classId);
+            const data = await res.json();
+            if (data.alerts.length === 0) {
+                document.getElementById('alertList').innerHTML = '<div class="empty-state">🎉 暂无预警学生</div>';
+                return;
+            }
+            let html = '';
+            data.alerts.forEach(a => {
+                html += `<div class="alert-item ${a.severity}">
+                    <div class="alert-avatar">${a.student.username[0].toUpperCase()}</div>
+                    <div class="alert-info">
+                        <div class="alert-name">${escapeHtml(a.student.username)}</div>
+                        <div class="alert-reasons">
+                            ${a.alerts.map(r => `<span class="alert-tag ${r.severity}">${escapeHtml(r.message)}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('alertList').innerHTML = html;
+        } catch(e) {
+            document.getElementById('alertList').innerHTML = '<div class="empty-state">加载失败</div>';
+        }
+    }
+
+    async function loadMastery(classId) {
+        if (!classId) {
+            document.getElementById('masteryList').innerHTML = '<div class="empty-state">请选择班级查看掌握度</div>';
+            return;
+        }
+        try {
+            const res = await fetch('/api/dashboard/knowledge-mastery?classId=' + classId);
+            const data = await res.json();
+
+            let items = [];
+            // 优先使用分项评分维度
+            if (data.dimensionAnalysis && data.dimensionAnalysis.length > 0) {
+                items = data.dimensionAnalysis.map(d => ({
+                    topic: d.dimension,
+                    rate: d.avg_max_score > 0 ? Math.round((d.avg_score / d.avg_max_score) * 100) : 0
+                }));
+            } else if (data.homeworkAnalysis && data.homeworkAnalysis.length > 0) {
+                items = data.homeworkAnalysis.map(d => ({
+                    topic: d.title,
+                    rate: d.max_score > 0 ? Math.round((d.avg_score / d.max_score) * 100) : 0
+                }));
+            } else if (data.mastery && data.mastery.length > 0) {
+                items = data.mastery.map(d => ({ topic: d.topic, rate: d.masteryRate }));
+            }
+
+            if (items.length === 0) {
+                document.getElementById('masteryList').innerHTML = '<div class="empty-state">暂无练习数据</div>';
+                return;
+            }
+
+            let html = '';
+            items.forEach(item => {
+                const cls = item.rate >= 70 ? 'high' : item.rate >= 50 ? 'mid' : 'low';
+                const color = item.rate >= 70 ? '#4ade80' : item.rate >= 50 ? '#eab308' : '#f87171';
+                html += `<div class="mastery-item">
+                    <span class="mastery-topic">${escapeHtml(item.topic)}</span>
+                    <div class="mastery-bar-wrap"><div class="mastery-bar-fill" style="width:${item.rate}%;background:${color}"></div></div>
+                    <span class="mastery-pct ${cls}">${item.rate}%</span>
+                </div>`;
+            });
+            document.getElementById('masteryList').innerHTML = html;
+        } catch(e) {
+            document.getElementById('masteryList').innerHTML = '<div class="empty-state">加载失败</div>';
+        }
+    }
+
+    function renderTrend(scoreTrend) {
+        if (!scoreTrend || scoreTrend.length === 0) {
+            document.getElementById('trendChart').innerHTML = '<div class="empty-state">暂无趋势数据</div>';
+            return;
+        }
+        const maxScore = Math.max(...scoreTrend.map(s => s.avg_score || 0), 1);
+        let html = '<div class="trend-chart">';
+        scoreTrend.forEach(s => {
+            const h = Math.round(((s.avg_score || 0) / (s.max_score || 100)) * 100);
+            html += `<div class="trend-point">
+                <span class="trend-value">${s.avg_score || 0}</span>
+                <div class="trend-bar" style="height:${Math.max(h, 4)}px"></div>
+                <span class="trend-label" title="${escapeHtml(s.title)}">${escapeHtml(s.title.substring(0, 6))}</span>
+            </div>`;
+        });
+        html += '</div>';
+        document.getElementById('trendChart').innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function logout() {
+        document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        location.href = '/login';
+    }
+
+    init();
+    </script>
+</body>
+</html>

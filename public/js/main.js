@@ -4,7 +4,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // 初始化所有功能模块
-    initNavbar();
+    initNavbarScroll();
     initScrollAnimations();
     initMobileNav();
     initSmoothScroll();
@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ============================================
    导航栏滚动效果
    ============================================ */
-function initNavbar() {
+function initNavbarScroll() {
     const navbar = document.getElementById('navbar');
     let lastScroll = 0;
 

@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>即时作业 - Autoconfig</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; min-height: 100vh; }
+
+        .page-header { padding: 20px 32px; background: #1a1f26; border-bottom: 1px solid #2d3640; display: flex; justify-content: space-between; align-items: center; }
+        .page-header h1 { font-size: 20px; }
+        .page-header .nav { display: flex; gap: 8px; }
+        .page-header .nav a { padding: 8px 16px; background: #2d3640; color: #e7e9ea; text-decoration: none; border-radius: 8px; font-size: 13px; }
+
+        .container { max-width: 960px; margin: 0 auto; padding: 24px; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: #1a1f26; padding: 4px; border-radius: 10px; }
+        .tabs .tab { flex: 1; padding: 10px 16px; text-align: center; border-radius: 8px; cursor: pointer; font-size: 14px; color: #8b98a5; transition: all 0.2s; }
+        .tabs .tab.active { background: #1d9bf0; color: #fff; font-weight: 600; }
+
+        /* 教师发布面板 */
+        .publish-panel { background: #1a1f26; border: 1px solid #2d3640; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+        .publish-panel h3 { font-size: 16px; margin-bottom: 16px; }
+        .form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+        .form-row .field { flex: 1; }
+        .form-row label { display: block; font-size: 12px; color: #8b98a5; margin-bottom: 4px; }
+        .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #2d3640; border-radius: 6px; color: #e7e9ea; font-size: 13px; outline: none; }
+        .form-row textarea { min-height: 60px; resize: vertical; font-family: 'JetBrains Mono', monospace; }
+
+        .question-builder { margin-top: 16px; border-top: 1px solid #2d3640; padding-top: 16px; }
+        .question-item { background: #0d1117; border: 1px solid #2d3640; border-radius: 8px; padding: 16px; margin-bottom: 12px; position: relative; }
+        .question-item .q-num { position: absolute; top: -8px; left: 12px; background: #1d9bf0; color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .question-item .remove-q { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #f4212e; cursor: pointer; font-size: 16px; }
+        .options-list { margin-top: 8px; }
+        .options-list .option-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .options-list .option-row input[type="text"] { flex: 1; }
+        .options-list .option-row input[type="radio"] { accent-color: #00ba7c; }
+
+        .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .btn-primary { background: #1d9bf0; color: #fff; }
+        .btn-primary:hover { background: #1a8cd8; }
+        .btn-success { background: #00ba7c; color: #fff; }
+        .btn-secondary { background: #2d3640; color: #e7e9ea; }
+        .btn-danger { background: #f4212e; color: #fff; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        /* 学生答题界面 */
+        .quiz-card { background: #1a1f26; border: 1px solid #2d3640; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+        .quiz-card .quiz-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .quiz-card .quiz-meta { font-size: 12px; color: #8b98a5; margin-bottom: 12px; }
+        .quiz-card .quiz-meta span { margin-right: 12px; }
+
+        .question-display { background: #0d1117; border: 1px solid #2d3640; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+        .question-display .q-title { font-size: 14px; font-weight: 500; margin-bottom: 10px; }
+        .question-display .q-content { font-size: 13px; color: #8b98a5; margin-bottom: 10px; white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; }
+        .option-choice { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 6px; background: #15191e; border: 1px solid #2d3640; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .option-choice:hover { border-color: #1d9bf0; }
+        .option-choice.selected { border-color: #1d9bf0; background: rgba(29, 155, 240, 0.1); }
+        .option-choice.correct { border-color: #00ba7c; background: rgba(0, 186, 124, 0.1); }
+        .option-choice.wrong { border-color: #f4212e; background: rgba(244, 33, 46, 0.1); }
+        .option-choice .letter { width: 24px; height: 24px; border-radius: 50%; background: #2d3640; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+
+        .code-fill-area { margin-top: 8px; }
+        .code-fill-area textarea { width: 100%; min-height: 80px; padding: 12px; background: #0d1117; border: 1px solid #2d3640; border-radius: 6px; color: #e7e9ea; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: vertical; outline: none; }
+        .code-fill-area textarea:focus { border-color: #1d9bf0; }
+
+        .timer-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #1a1f26; border: 1px solid #2d3640; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+        .timer-bar .time { font-weight: 700; color: #ffb800; font-size: 18px; font-family: 'JetBrains Mono', monospace; }
+        .timer-bar .progress { flex: 1; height: 6px; background: #2d3640; border-radius: 3px; overflow: hidden; }
+        .timer-bar .progress .fill { height: 100%; background: linear-gradient(90deg, #00ba7c, #1d9bf0); transition: width 1s linear; }
+
+        .result-banner { padding: 16px; border-radius: 8px; margin-bottom: 16px; text-align: center; font-weight: 600; font-size: 16px; }
+        .result-banner.success { background: rgba(0, 186, 124, 0.1); border: 1px solid #00ba7c; color: #00ba7c; }
+        .result-banner.partial { background: rgba(255, 184, 0, 0.1); border: 1px solid #ffb800; color: #ffb800; }
+        .result-banner.fail { background: rgba(244, 33, 46, 0.1); border: 1px solid #f4212e; color: #f4212e; }
+
+        .leaderboard-list { max-height: 300px; overflow-y: auto; }
+        .lb-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid #1e252c; }
+        .lb-item .rank { width: 28px; text-align: center; font-weight: 700; color: #ffb800; }
+        .lb-item .name { flex: 1; font-size: 13px; }
+        .lb-item .score { font-weight: 600; color: #1d9bf0; }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <h1>⚡ 即时作业系统</h1>
+        <div class="nav">
+            <a href="/class-analytics">📊 学情看板</a>
+            <a href="/homework">📝 作业管理</a>
+            <a href="/classes">🏫 班级</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" data-tab="quizzes" onclick="switchTab('quizzes')">📋 限时测验</div>
+            <div class="tab" data-tab="code-fill" onclick="switchTab('code-fill')">💻 代码填空</div>
+            <div class="tab" data-tab="publish" onclick="switchTab('publish')">➕ 发布新题</div>
+        </div>
+
+        <!-- 测验列表 -->
+        <div id="tabQuizzes">
+            <div class="form-row" style="margin-bottom: 16px;">
+                <div class="field">
+                    <select id="quizClassFilter" onchange="loadQuizzes()">
+                        <option value="">选择班级...</option>
+                    </select>
+                </div>
+            </div>
+            <div id="quizList"></div>
+        </div>
+
+        <!-- 代码填空列表 -->
+        <div id="tabCodeFill" style="display: none;">
+            <div id="codeFillList"></div>
+        </div>
+
+        <!-- 发布面板 (教师) -->
+        <div id="tabPublish" style="display: none;">
+            <div class="publish-panel">
+                <h3>发布即时测验</h3>
+                <div class="form-row">
+                    <div class="field">
+                        <label>班级</label>
+                        <select id="pubClass"></select>
+                    </div>
+                    <div class="field">
+                        <label>题型</label>
+                        <select id="pubType" onchange="updateQuestionBuilder()">
+                            <option value="mcq">选择题</option>
+                            <option value="true_false">判断题</option>
+                            <option value="code_fill">代码填空</option>
+                            <option value="unit_test">单元测试</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>限时(秒)</label>
+                        <input type="number" id="pubTimeLimit" value="300" min="30">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>测验标题</label>
+                        <input type="text" id="pubTitle" placeholder="如: 第三章随堂测验">
+                    </div>
+                </div>
+
+                <div class="question-builder">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h4 style="font-size: 14px;">题目列表</h4>
+                        <button class="btn btn-sm btn-secondary" onclick="addQuestion()">+ 添加题目</button>
+                    </div>
+                    <div id="questionList"></div>
+                </div>
+
+                <div style="margin-top: 16px; text-align: right;">
+                    <button class="btn btn-primary" onclick="publishQuiz()">🚀 发布测验</button>
+                </div>
+            </div>
+
+            <!-- 代码填空发布 -->
+            <div class="publish-panel">
+                <h3>发布代码填空作业</h3>
+                <div class="form-row">
+                    <div class="field">
+                        <label>班级</label>
+                        <select id="cfClass"></select>
+                    </div>
+                    <div class="field">
+                        <label>语言</label>
+                        <select id="cfLang">
+                            <option value="html">HTML</option>
+                            <option value="css">CSS</option>
+                            <option value="javascript">JavaScript</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>标题</label>
+                        <input type="text" id="cfTitle" placeholder="如: HTML标签填空练习">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>代码模板 (用 ___BLANK___ 标记空白处)</label>
+                        <textarea id="cfTemplate" rows="8" placeholder="<div class=&quot;___BLANK___&quot;>&#10;  <h1>___BLANK___</h1>&#10;</div>"></textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field">
+                        <label>正确答案 (每行一个空的答案，用 ||| 分隔多个可接受答案)</label>
+                        <textarea id="cfAnswers" rows="4" placeholder="container&#10;Hello World|||Hello, World!"></textarea>
+                    </div>
+                </div>
+                <div style="margin-top: 12px; text-align: right;">
+                    <button class="btn btn-success" onclick="publishCodeFill()">📝 发布代码填空</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 答题界面（动态显示） -->
+        <div id="quizTaking" style="display: none;">
+            <div class="timer-bar" id="timerBar">
+                <span>⏱️ 剩余时间：</span>
+                <span class="time" id="timerDisplay">05:00</span>
+                <div class="progress"><div class="fill" id="timerFill" style="width: 100%;"></div></div>
+                <span id="progressText">0/0</span>
+            </div>
+            <div id="questionArea"></div>
+            <div style="text-align: center; margin-top: 16px;">
+                <button class="btn btn-primary" id="btnNext" onclick="nextQuestion()">下一题 →</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userRole = 'user';
+        let quizzes = [];
+        let currentQuiz = null;
+        let currentQuestions = [];
+        let currentQIdx = 0;
+        let timerInterval = null;
+        let timeRemaining = 0;
+        let publishQuestions = [];
+
+        async function apiCall(url, options = {}) {
+            const token = localStorage.getItem('token') || document.cookie.match(/token=([^;]+)/)?.[1];
+            const res = await fetch(url, {
+                ...options,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, ...options.headers }
+            });
+            return res.json();
+        }
+
+        async function init() {
+            // 获取用户信息
+            const userData = await apiCall('/api/auth/me');
+            if (userData.user) userRole = userData.user.role;
+
+            // 加载班级
+            const classData = await apiCall('/api/classes/my');
+            const classes = classData.classes || [];
+
+            ['quizClassFilter', 'pubClass', 'cfClass'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (sel) {
+                    classes.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.name;
+                        sel.appendChild(opt);
+                    });
+                }
+            });
+
+            // 非教师隐藏发布 tab
+            if (userRole !== 'teacher' && userRole !== 'admin') {
+                document.querySelector('[data-tab="publish"]').style.display = 'none';
+            }
+
+            if (classes.length > 0) {
+                document.getElementById('quizClassFilter').value = classes[0].id;
+                loadQuizzes();
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            document.getElementById('tabQuizzes').style.display = tab === 'quizzes' ? '' : 'none';
+            document.getElementById('tabCodeFill').style.display = tab === 'code-fill' ? '' : 'none';
+            document.getElementById('tabPublish').style.display = tab === 'publish' ? '' : 'none';
+            document.getElementById('quizTaking').style.display = 'none';
+
+            if (tab === 'code-fill') loadCodeFillList();
+        }
+
+        // ==================== 测验列表 ====================
+        async function loadQuizzes() {
+            const classId = document.getElementById('quizClassFilter').value;
+            if (!classId) return;
+
+            const data = await apiCall(`/api/instant/quiz/list?classId=${classId}`);
+            const list = document.getElementById('quizList');
+
+            if (!data.quizzes || data.quizzes.length === 0) {
+                list.innerHTML = '<div class="quiz-card"><div class="empty-msg" style="padding:20px;">暂无测验</div></div>';
+                return;
+            }
+
+            list.innerHTML = data.quizzes.map(q => {
+                const isTeacher = userRole === 'teacher' || userRole === 'admin';
+                const statusBadge = q.is_active ? '<span style="color:#00ba7c;">● 进行中</span>' : '<span style="color:#8b98a5;">○ 已结束</span>';
+                const myScore = q.my_score !== null && q.my_score !== undefined ? `<span style="color:#1d9bf0;">我的得分: ${q.my_score}/${q.max_score}</span>` : '';
+
+                return `<div class="quiz-card">
+                    <div class="quiz-title">${q.title} ${statusBadge}</div>
+                    <div class="quiz-meta">
+                        <span>📝 ${q.question_count} 题</span>
+                        <span>⏱️ ${Math.floor(q.time_limit / 60)}分钟</span>
+                        <span>🏆 满分 ${q.max_score}</span>
+                        ${isTeacher ? `<span>👥 ${q.response_count || 0}人作答</span>` : myScore}
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        ${q.is_active && !isTeacher && q.my_score == null ? `<button class="btn btn-sm btn-primary" onclick="startQuiz(${q.id})">开始答题</button>` : ''}
+                        ${isTeacher ? `<button class="btn btn-sm btn-secondary" onclick="toggleQuiz(${q.id}, ${q.is_active ? 0 : 1})">${q.is_active ? '关闭' : '开启'}</button>` : ''}
+                        <button class="btn btn-sm btn-secondary" onclick="viewLeaderboard(${q.id})">排行榜</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // ==================== 答题 ====================
+        async function startQuiz(quizId) {
+            const data = await apiCall(`/api/instant/quiz/${quizId}`);
+            currentQuiz = data.quiz;
+            currentQuestions = data.questions;
+            currentQIdx = 0;
+
+            // 过滤已答题
+            const answeredIds = new Set((data.myResponses || []).map(r => r.question_id));
+            currentQuestions = currentQuestions.filter(q => !answeredIds.has(q.id));
+
+            if (currentQuestions.length === 0) {
+                alert('你已完成本次测验！');
+                return;
+            }
+
+            // 显示答题界面
+            document.getElementById('tabQuizzes').style.display = 'none';
+            document.getElementById('quizTaking').style.display = '';
+
+            // 启动计时器
+            timeRemaining = currentQuiz.time_limit;
+            updateTimer();
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimer();
+                if (timeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    alert('时间到！');
+                    finishQuiz();
+                }
+            }, 1000);
+
+            renderCurrentQuestion();
+        }
+
+        function updateTimer() {
+            const min = Math.floor(timeRemaining / 60);
+            const sec = timeRemaining % 60;
+            document.getElementById('timerDisplay').textContent = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+            document.getElementById('timerFill').style.width = `${(timeRemaining / currentQuiz.time_limit) * 100}%`;
+            document.getElementById('progressText').textContent = `${currentQIdx + 1}/${currentQuestions.length}`;
+        }
+
+        function renderCurrentQuestion() {
+            const q = currentQuestions[currentQIdx];
+            if (!q) { finishQuiz(); return; }
+
+            const area = document.getElementById('questionArea');
+            let html = `<div class="question-display">
+                <div class="q-title">第 ${currentQIdx + 1} 题 (${q.points}分): ${q.title}</div>`;
+
+            if (q.content) html += `<div class="q-content">${escapeHtml(q.content)}</div>`;
+
+            if (q.question_type === 'mcq' || q.question_type === 'true_false') {
+                const options = q.options || [];
+                html += options.map((opt, i) => {
+                    const letter = String.fromCharCode(65 + i);
+                    return `<div class="option-choice" data-answer="${letter}" onclick="selectOption(this, '${letter}')">
+                        <span class="letter">${letter}</span>
+                        <span>${escapeHtml(opt)}</span>
+                    </div>`;
+                }).join('');
+            } else if (q.question_type === 'code_fill' || q.question_type === 'unit_test') {
+                html += `<div class="code-fill-area">
+                    <textarea id="codeAnswer" placeholder="在此输入代码...">${q.code_template || ''}</textarea>
+                </div>`;
+            }
+
+            html += '</div>';
+            area.innerHTML = html;
+
+            document.getElementById('btnNext').textContent = currentQIdx < currentQuestions.length - 1 ? '提交并下一题 →' : '提交并完成 ✓';
+        }
+
+        function selectOption(el, answer) {
+            document.querySelectorAll('.option-choice').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            el.dataset.selected = 'true';
+        }
+
+        async function nextQuestion() {
+            const q = currentQuestions[currentQIdx];
+            let answer = '';
+
+            if (q.question_type === 'mcq' || q.question_type === 'true_false') {
+                const selected = document.querySelector('.option-choice.selected');
+                if (!selected) { alert('请选择一个答案'); return; }
+                answer = selected.dataset.answer;
+            } else {
+                answer = document.getElementById('codeAnswer')?.value || '';
+                if (!answer.trim()) { alert('请输入答案'); return; }
+            }
+
+            // 提交答案
+            const result = await apiCall(`/api/instant/quiz/${currentQuiz.id}/answer`, {
+                method: 'POST',
+                body: JSON.stringify({ questionId: q.id, answer, timeSpent: 0 })
+            });
+
+            // 显示结果反馈
+            if (result.is_correct !== undefined) {
+                if (q.question_type === 'mcq' || q.question_type === 'true_false') {
+                    const selected = document.querySelector('.option-choice.selected');
+                    if (result.is_correct) {
+                        selected.classList.add('correct');
+                    } else {
+                        selected.classList.add('wrong');
+                    }
+                }
+            }
+
+            // 短暂延迟后进入下一题
+            await new Promise(r => setTimeout(r, 600));
+
+            if (result.completed) {
+                clearInterval(timerInterval);
+                const area = document.getElementById('questionArea');
+                const pct = Math.round((result.totalScore / currentQuiz.max_score) * 100);
+                const cls = pct >= 80 ? 'success' : pct >= 60 ? 'partial' : 'fail';
+                area.innerHTML = `<div class="result-banner ${cls}">
+                    🎉 测验完成！得分：${result.totalScore} / ${currentQuiz.max_score} (${pct}%)
+                </div>`;
+                document.getElementById('btnNext').style.display = 'none';
+                document.getElementById('timerBar').style.display = 'none';
+                return;
+            }
+
+            currentQIdx++;
+            renderCurrentQuestion();
+            updateTimer();
+        }
+
+        function finishQuiz() {
+            document.getElementById('quizTaking').style.display = 'none';
+            document.getElementById('tabQuizzes').style.display = '';
+            clearInterval(timerInterval);
+            loadQuizzes();
+        }
+
+        async function viewLeaderboard(quizId) {
+            const data = await apiCall(`/api/instant/quiz/${quizId}/leaderboard`);
+            const list = document.getElementById('quizList');
+            list.innerHTML = `
+                <div class="quiz-card">
+                    <div class="quiz-title">🏆 排行榜</div>
+                    <div class="leaderboard-list">
+                        ${(data.leaderboard || []).map((s, i) => `
+                            <div class="lb-item">
+                                <span class="rank">${i + 1}</span>
+                                <span class="name">${s.username}</span>
+                                <span class="score">${s.total_score}分 (${s.correct_count}/${s.answer_count}正确)</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-sm btn-secondary" style="margin-top:12px;" onclick="loadQuizzes()">← 返回</button>
+                </div>`;
+        }
+
+        async function toggleQuiz(quizId, active) {
+            await apiCall(`/api/instant/quiz/${quizId}/toggle`, { method: 'POST', body: JSON.stringify({ active }) });
+            loadQuizzes();
+        }
+
+        // ==================== 代码填空 ====================
+        async function loadCodeFillList() {
+            const classId = document.getElementById('quizClassFilter').value;
+            if (!classId) return;
+
+            const data = await apiCall(`/api/instant/code-fill/list?classId=${classId}`);
+            const list = document.getElementById('codeFillList');
+
+            if (!data.assignments || data.assignments.length === 0) {
+                list.innerHTML = '<div class="quiz-card"><div style="padding:20px;text-align:center;color:#8b98a5;">暂无代码填空作业</div></div>';
+                return;
+            }
+
+            list.innerHTML = data.assignments.map(a => `
+                <div class="quiz-card">
+                    <div class="quiz-title">${a.title}</div>
+                    <div class="quiz-meta">
+                        <span>📝 ${a.language}</span>
+                        <span>🏆 满分 ${a.max_score}</span>
+                        <span>👥 ${a.submission_count}人完成</span>
+                        ${a.my_completed ? `<span style="color:#00ba7c;">✓ 已完成 (${a.my_score}分)</span>` : ''}
+                    </div>
+                    ${!a.my_completed ? `<button class="btn btn-sm btn-primary" style="margin-top:8px;" onclick="startCodeFill(${a.id})">开始作答</button>` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function startCodeFill(assignmentId) {
+            const data = await apiCall(`/api/instant/code-fill/${assignmentId}`);
+            const a = data.assignment;
+            const blanks = a.blanks || [];
+
+            // 解析代码模板中的空白
+            const code = a.code_template;
+            const parts = code.split('___BLANK___');
+
+            const list = document.getElementById('codeFillList');
+            let html = `<div class="quiz-card">
+                <div class="quiz-title">${a.title}</div>
+                <div style="background:#0d1117; padding:16px; border-radius:8px; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:2; margin:12px 0;">`;
+
+            for (let i = 0; i < parts.length; i++) {
+                html += `<span style="color:#8b98a5;">${escapeHtml(parts[i])}</span>`;
+                if (i < parts.length - 1) {
+                    html += `<input type="text" class="code-blank-input" data-idx="${i}" style="width:120px; padding:4px 8px; background:#1e252c; border:1px solid #1d9bf0; border-radius:4px; color:#e7e9ea; font-family:inherit; font-size:13px; margin:0 4px;">`;
+                }
+            }
+
+            html += `</div>
+                <div style="text-align:right;">
+                    <button class="btn btn-secondary" onclick="loadCodeFillList()">取消</button>
+                    <button class="btn btn-success" onclick="submitCodeFill(${a.id})">提交答案</button>
+                </div>
+            </div>`;
+
+            list.innerHTML = html;
+        }
+
+        async function submitCodeFill(assignmentId) {
+            const inputs = document.querySelectorAll('.code-blank-input');
+            const answers = Array.from(inputs).map(inp => inp.value);
+
+            const result = await apiCall(`/api/instant/code-fill/${assignmentId}/submit`, {
+                method: 'POST',
+                body: JSON.stringify({ answers, timeSpent: 0 })
+            });
+
+            if (result.success) {
+                const pct = Math.round((result.score / result.max_score) * 100);
+                const cls = result.is_all_correct ? 'success' : pct >= 60 ? 'partial' : 'fail';
+                document.getElementById('codeFillList').innerHTML = `
+                    <div class="result-banner ${cls}">
+                        得分：${result.score} / ${result.max_score} (正确 ${result.correct_count}/${result.total_blanks})
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadCodeFillList()">← 返回列表</button>`;
+            } else {
+                alert(result.error || '提交失败');
+            }
+        }
+
+        // ==================== 发布测验 ====================
+        function addQuestion() {
+            const type = document.getElementById('pubType').value;
+            const idx = publishQuestions.length;
+            publishQuestions.push({ type, title: '', options: ['', '', '', ''], correctAnswer: 'A', content: '', codeTemplate: '', testCases: [] });
+            renderPublishQuestions();
+        }
+
+        function renderPublishQuestions() {
+            const list = document.getElementById('questionList');
+            list.innerHTML = publishQuestions.map((q, i) => {
+                let optionsHtml = '';
+                if (q.type === 'mcq' || q.type === 'true_false') {
+                    const opts = q.type === 'true_false' ? ['正确', '错误'] : q.options;
+                    optionsHtml = `<div class="options-list">${opts.map((opt, j) => {
+                        const letter = String.fromCharCode(65 + j);
+                        return `<div class="option-row">
+                            <input type="radio" name="correct_${i}" value="${letter}" ${q.correctAnswer === letter ? 'checked' : ''} onchange="publishQuestions[${i}].correctAnswer='${letter}'">
+                            <input type="text" value="${opt}" placeholder="选项${letter}" onchange="publishQuestions[${i}].options[${j}]=this.value">
+                        </div>`;
+                    }).join('')}</div>`;
+                } else {
+                    optionsHtml = `<div class="form-row"><div class="field"><label>正确答案</label><textarea onchange="publishQuestions[${i}].correctAnswer=this.value" placeholder="正确答案（代码或文本）">${q.correctAnswer}</textarea></div></div>`;
+                }
+
+                return `<div class="question-item">
+                    <span class="q-num">第${i + 1}题</span>
+                    <button class="remove-q" onclick="publishQuestions.splice(${i},1);renderPublishQuestions()">×</button>
+                    <div class="form-row"><div class="field">
+                        <label>题目</label>
+                        <input type="text" value="${q.title}" onchange="publishQuestions[${i}].title=this.value" placeholder="题目内容">
+                    </div></div>
+                    ${optionsHtml}
+                </div>`;
+            }).join('');
+        }
+
+        async function publishQuiz() {
+            const classId = document.getElementById('pubClass').value;
+            const title = document.getElementById('pubTitle').value.trim();
+            const timeLimit = parseInt(document.getElementById('pubTimeLimit').value) || 300;
+            const quizType = document.getElementById('pubType').value;
+
+            if (!classId || !title || publishQuestions.length === 0) {
+                alert('请填写完整信息并至少添加一道题目');
+                return;
+            }
+
+            const questions = publishQuestions.map(q => ({
+                type: q.type,
+                title: q.title,
+                options: q.options.filter(o => o),
+                correctAnswer: q.correctAnswer,
+                codeTemplate: q.codeTemplate,
+                testCases: q.testCases,
+                points: 10
+            }));
+
+            const result = await apiCall('/api/instant/quiz/create', {
+                method: 'POST',
+                body: JSON.stringify({ classId, title, quizType, timeLimit, questions })
+            });
+
+            if (result.success) {
+                alert(`测验「${title}」发布成功！共 ${result.quiz.questionCount} 题`);
+                publishQuestions = [];
+                renderPublishQuestions();
+                document.getElementById('pubTitle').value = '';
+                switchTab('quizzes');
+                loadQuizzes();
+            } else {
+                alert(result.error || '发布失败');
+            }
+        }
+
+        async function publishCodeFill() {
+            const classId = document.getElementById('cfClass').value;
+            const title = document.getElementById('cfTitle').value.trim();
+            const language = document.getElementById('cfLang').value;
+            const codeTemplate = document.getElementById('cfTemplate').value;
+            const answersRaw = document.getElementById('cfAnswers').value.trim();
+
+            if (!classId || !title || !codeTemplate || !answersRaw) {
+                alert('请填写完整信息');
+                return;
+            }
+
+            const blanks = answersRaw.split('\n').map(line => ({ answer: line.trim() }));
+
+            const result = await apiCall('/api/instant/code-fill/create', {
+                method: 'POST',
+                body: JSON.stringify({ classId, title, language, codeTemplate, blanks, matchMode: 'exact' })
+            });
+
+            if (result.success) {
+                alert('代码填空作业发布成功！');
+                document.getElementById('cfTitle').value = '';
+                document.getElementById('cfTemplate').value = '';
+                document.getElementById('cfAnswers').value = '';
+            } else {
+                alert(result.error || '发布失败');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        init();
+    </script>
+</body>
+</html>

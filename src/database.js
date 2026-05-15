@@ -145,6 +145,863 @@ function initDatabase() {
     try { db.exec('ALTER TABLE users ADD COLUMN coins INTEGER DEFAULT 0'); } catch(e) {}
     // 兼容旧版数据库：为 users 表添加 role 列
     try { db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"); } catch(e) {}
+    // 兼容旧版数据库：为 users 表添加 school 列（学校名称）
+    try { db.exec("ALTER TABLE users ADD COLUMN school TEXT DEFAULT ''"); } catch(e) {}
+
+    // 兼容旧版数据库：为 projects 表添加学科分类字段
+    try { db.exec("ALTER TABLE projects ADD COLUMN school_level TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE projects ADD COLUMN subject TEXT DEFAULT ''"); } catch(e) {}
+
+    // 创建学科分类索引
+    try { db.exec("CREATE INDEX IF NOT EXISTS idx_projects_subject ON projects(school_level, subject)"); } catch(e) {}
+
+    // 创建学生练习记录表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS exercise_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            project_id INTEGER NOT NULL,
+            score INTEGER DEFAULT 0,
+            max_score INTEGER DEFAULT 100,
+            level_reached INTEGER DEFAULT 0,
+            completed INTEGER DEFAULT 0,
+            time_spent INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_exercise_user ON exercise_records(user_id);
+        CREATE INDEX IF NOT EXISTS idx_exercise_project ON exercise_records(project_id);
+    `);
+
+    // 班级/小组表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS classes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            teacher_id INTEGER NOT NULL,
+            invite_code TEXT UNIQUE NOT NULL,
+            school_level TEXT DEFAULT '',
+            subject TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_classes_teacher ON classes(teacher_id);
+    `);
+
+    // 班级成员表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS class_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT DEFAULT 'student',
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(class_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_class_members_class ON class_members(class_id);
+        CREATE INDEX IF NOT EXISTS idx_class_members_user ON class_members(user_id);
+    `);
+
+    // 迁移：给 class_members 添加 role 列（兼容已有数据库）
+    try {
+        db.exec(`ALTER TABLE class_members ADD COLUMN role TEXT DEFAULT 'student'`);
+    } catch (e) {
+        // 列已存在，忽略
+    }
+
+    // 作业表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS homework (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            class_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            due_date DATETIME,
+            max_score INTEGER DEFAULT 100,
+            attachment_url TEXT DEFAULT '',
+            status TEXT DEFAULT 'active',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_homework_class ON homework(class_id);
+        CREATE INDEX IF NOT EXISTS idx_homework_teacher ON homework(teacher_id);
+    `);
+
+    // 作业提交表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS homework_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            homework_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            content TEXT DEFAULT '',
+            attachment_url TEXT DEFAULT '',
+            score INTEGER DEFAULT NULL,
+            feedback TEXT DEFAULT '',
+            status TEXT DEFAULT 'submitted',
+            submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            graded_at DATETIME,
+            FOREIGN KEY (homework_id) REFERENCES homework(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(homework_id, student_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_submissions_homework ON homework_submissions(homework_id);
+        CREATE INDEX IF NOT EXISTS idx_submissions_student ON homework_submissions(student_id);
+    `);
+
+    // 班级公告表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS announcements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT DEFAULT '',
+            priority TEXT DEFAULT 'normal',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_announcements_class ON announcements(class_id);
+    `);
+
+    // 作业分项评分表（多维度批改）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS homework_dimension_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            submission_id INTEGER NOT NULL,
+            dimension TEXT NOT NULL,
+            score INTEGER DEFAULT 0,
+            max_score INTEGER DEFAULT 100,
+            comment TEXT DEFAULT '',
+            FOREIGN KEY (submission_id) REFERENCES homework_submissions(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_dim_scores_submission ON homework_dimension_scores(submission_id);
+    `);
+
+    // 代码批注表（逐行点评）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS code_annotations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            submission_id INTEGER NOT NULL,
+            file_type TEXT DEFAULT 'html',
+            line_start INTEGER NOT NULL,
+            line_end INTEGER DEFAULT NULL,
+            content TEXT NOT NULL,
+            severity TEXT DEFAULT 'info',
+            teacher_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (submission_id) REFERENCES homework_submissions(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_annotations_submission ON code_annotations(submission_id);
+    `);
+
+    // 查重报告表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS plagiarism_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            homework_id INTEGER NOT NULL,
+            student_a_id INTEGER NOT NULL,
+            student_b_id INTEGER NOT NULL,
+            similarity REAL DEFAULT 0,
+            matched_lines TEXT DEFAULT '[]',
+            status TEXT DEFAULT 'detected',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (homework_id) REFERENCES homework(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_a_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_b_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_plagiarism_homework ON plagiarism_reports(homework_id);
+    `);
+
+    // 学生分组表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS student_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            max_members INTEGER DEFAULT 5,
+            created_by INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_groups_class ON student_groups(class_id);
+    `);
+
+    // 分组成员表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS group_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT DEFAULT 'member',
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (group_id) REFERENCES student_groups(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(group_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_group_members_group ON group_members(group_id);
+    `);
+
+    // 考勤签到表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            code TEXT NOT NULL,
+            title TEXT DEFAULT '课堂签到',
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_attendance_class ON attendance(class_id);
+    `);
+
+    // 签到记录表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS attendance_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            attendance_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            signed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (attendance_id) REFERENCES attendance(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(attendance_id, student_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_attend_records_attendance ON attendance_records(attendance_id);
+    `);
+
+    // 作业催交记录表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS homework_reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            homework_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            message TEXT DEFAULT '请尽快提交作业',
+            sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (homework_id) REFERENCES homework(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_reminders_homework ON homework_reminders(homework_id);
+    `);
+
+    // 兼容迁移：homework 添加新字段
+    try { db.exec("ALTER TABLE homework ADD COLUMN type TEXT DEFAULT 'individual'"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN grading_dimensions TEXT DEFAULT '[]'"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN allow_resubmit INTEGER DEFAULT 1"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN test_script TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN test_config TEXT DEFAULT '{}'"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN peer_review_enabled INTEGER DEFAULT 0"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN peer_review_count INTEGER DEFAULT 3"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN score_weights TEXT DEFAULT '{\"teacher\":0.6,\"peer\":0.3,\"self\":0.1}'"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN difficulty_level TEXT DEFAULT 'normal'"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN target_group_id INTEGER DEFAULT NULL"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN type TEXT DEFAULT 'individual'"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN grading_dimensions TEXT DEFAULT '[]'"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework ADD COLUMN allow_resubmit INTEGER DEFAULT 1"); } catch(e) {}
+
+    // 兼容迁移：homework_submissions 添加新字段
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN reject_reason TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN submit_count INTEGER DEFAULT 1"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN group_id INTEGER DEFAULT NULL"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN auto_test_result TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN auto_test_score INTEGER DEFAULT NULL"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN self_score INTEGER DEFAULT NULL"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN peer_avg_score REAL DEFAULT NULL"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN final_score REAL DEFAULT NULL"); } catch(e) {}
+
+    // 兼容迁移：classes 添加学期字段
+    try { db.exec("ALTER TABLE classes ADD COLUMN semester TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE classes ADD COLUMN archived INTEGER DEFAULT 0"); } catch(e) {}
+
+    // 兼容迁移：templates 添加半成品模板字段
+    try { db.exec("ALTER TABLE templates ADD COLUMN is_scaffold INTEGER DEFAULT 0"); } catch(e) {}
+    try { db.exec("ALTER TABLE templates ADD COLUMN fill_blanks TEXT DEFAULT '[]'"); } catch(e) {}
+
+    // 协作会话表（Pair Programming / Yjs）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS collab_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            host_id INTEGER NOT NULL,
+            session_code TEXT UNIQUE NOT NULL,
+            status TEXT DEFAULT 'active',
+            mode TEXT DEFAULT 'pair',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ended_at DATETIME,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+            FOREIGN KEY (host_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_collab_project ON collab_sessions(project_id);
+        CREATE INDEX IF NOT EXISTS idx_collab_host ON collab_sessions(host_id);
+    `);
+
+    // 协作参与者表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS collab_participants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT DEFAULT 'viewer',
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            left_at DATETIME,
+            FOREIGN KEY (session_id) REFERENCES collab_sessions(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_collab_parts_session ON collab_participants(session_id);
+    `);
+
+    // 代码回放轨迹表（Code Playback）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS code_keystrokes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            submission_id INTEGER,
+            user_id INTEGER NOT NULL,
+            project_id INTEGER,
+            file_type TEXT DEFAULT 'html',
+            action TEXT NOT NULL,
+            position INTEGER DEFAULT 0,
+            content TEXT DEFAULT '',
+            timestamp INTEGER NOT NULL,
+            session_start INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_keystrokes_user ON code_keystrokes(user_id);
+        CREATE INDEX IF NOT EXISTS idx_keystrokes_submission ON code_keystrokes(submission_id);
+        CREATE INDEX IF NOT EXISTS idx_keystrokes_session ON code_keystrokes(session_start);
+    `);
+
+    // 自动化测试结果表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS auto_test_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            submission_id INTEGER NOT NULL,
+            test_name TEXT NOT NULL,
+            passed INTEGER DEFAULT 0,
+            message TEXT DEFAULT '',
+            expected TEXT DEFAULT '',
+            actual TEXT DEFAULT '',
+            duration INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (submission_id) REFERENCES homework_submissions(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_autotest_submission ON auto_test_results(submission_id);
+    `);
+
+    // 互评分配表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS peer_review_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            homework_id INTEGER NOT NULL,
+            reviewer_id INTEGER NOT NULL,
+            submission_id INTEGER NOT NULL,
+            score INTEGER DEFAULT NULL,
+            feedback TEXT DEFAULT '',
+            checklist_results TEXT DEFAULT '[]',
+            status TEXT DEFAULT 'pending',
+            reviewed_at DATETIME,
+            FOREIGN KEY (homework_id) REFERENCES homework(id) ON DELETE CASCADE,
+            FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (submission_id) REFERENCES homework_submissions(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_peer_review_hw ON peer_review_assignments(homework_id);
+        CREATE INDEX IF NOT EXISTS idx_peer_review_reviewer ON peer_review_assignments(reviewer_id);
+        CREATE INDEX IF NOT EXISTS idx_peer_review_submission ON peer_review_assignments(submission_id);
+    `);
+
+    // 语法检测报告表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS lint_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            submission_id INTEGER,
+            user_id INTEGER NOT NULL,
+            project_id INTEGER,
+            file_type TEXT DEFAULT 'html',
+            errors TEXT DEFAULT '[]',
+            warnings TEXT DEFAULT '[]',
+            error_count INTEGER DEFAULT 0,
+            warning_count INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_lint_user ON lint_reports(user_id);
+        CREATE INDEX IF NOT EXISTS idx_lint_submission ON lint_reports(submission_id);
+    `);
+
+    // 金币道具表（迟交券、重做卡等）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS coin_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            description TEXT DEFAULT '',
+            price INTEGER NOT NULL DEFAULT 0,
+            type TEXT DEFAULT 'consumable',
+            effect TEXT DEFAULT '{}',
+            icon TEXT DEFAULT '🎫',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+    // 用户道具持有表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS user_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            used_count INTEGER DEFAULT 0,
+            acquired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (item_id) REFERENCES coin_items(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_user_items_user ON user_items(user_id);
+    `);
+
+    // 金币任务/成就表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS coin_missions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            description TEXT DEFAULT '',
+            reward INTEGER NOT NULL DEFAULT 0,
+            type TEXT DEFAULT 'daily',
+            condition_type TEXT NOT NULL,
+            condition_value INTEGER DEFAULT 1,
+            icon TEXT DEFAULT '🎯',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+    // 用户任务完成记录
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS user_mission_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            mission_id INTEGER NOT NULL,
+            progress INTEGER DEFAULT 0,
+            completed INTEGER DEFAULT 0,
+            claimed INTEGER DEFAULT 0,
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (mission_id) REFERENCES coin_missions(id) ON DELETE CASCADE,
+            UNIQUE(user_id, mission_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_mission_progress_user ON user_mission_progress(user_id);
+    `);
+
+    // 代码活跃度记录表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS code_activity (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            class_id INTEGER,
+            lines_added INTEGER DEFAULT 0,
+            lines_deleted INTEGER DEFAULT 0,
+            edit_duration INTEGER DEFAULT 0,
+            date TEXT NOT NULL,
+            hour INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_activity_user_date ON code_activity(user_id, date);
+        CREATE INDEX IF NOT EXISTS idx_activity_class ON code_activity(class_id, date);
+    `);
+
+    // ==================== 教学级 IM 系统表 ====================
+
+    // 聊天室/房间表（支持私信、班级群、小组群、答疑Ticket）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_rooms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT DEFAULT '',
+            type TEXT NOT NULL DEFAULT 'dm',
+            class_id INTEGER DEFAULT NULL,
+            group_id INTEGER DEFAULT NULL,
+            owner_id INTEGER NOT NULL,
+            avatar TEXT DEFAULT '',
+            announcement TEXT DEFAULT '',
+            is_muted INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_rooms_type ON chat_rooms(type);
+        CREATE INDEX IF NOT EXISTS idx_chat_rooms_class ON chat_rooms(class_id);
+        CREATE INDEX IF NOT EXISTS idx_chat_rooms_group ON chat_rooms(group_id);
+    `);
+
+    // 聊天室成员表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_room_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            role TEXT DEFAULT 'member',
+            is_muted INTEGER DEFAULT 0,
+            last_read_msg_id INTEGER DEFAULT 0,
+            joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(room_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_room_members_room ON chat_room_members(room_id);
+        CREATE INDEX IF NOT EXISTS idx_room_members_user ON chat_room_members(user_id);
+    `);
+
+    // 群组消息表（支持代码片段、Markdown、系统消息等）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL,
+            sender_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            type TEXT DEFAULT 'text',
+            metadata TEXT DEFAULT '{}',
+            reply_to INTEGER DEFAULT NULL,
+            is_pinned INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+            FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_msgs_room ON chat_messages(room_id, id);
+        CREATE INDEX IF NOT EXISTS idx_chat_msgs_sender ON chat_messages(sender_id);
+    `);
+
+    // 答疑工单表 (Ticket)
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            assignee_id INTEGER DEFAULT NULL,
+            title TEXT NOT NULL,
+            status TEXT DEFAULT 'open',
+            priority TEXT DEFAULT 'normal',
+            project_url TEXT DEFAULT '',
+            error_log TEXT DEFAULT '',
+            resolved_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_tickets_room ON chat_tickets(room_id);
+        CREATE INDEX IF NOT EXISTS idx_tickets_student ON chat_tickets(student_id);
+        CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON chat_tickets(assignee_id);
+        CREATE INDEX IF NOT EXISTS idx_tickets_status ON chat_tickets(status);
+    `);
+
+    // 金币悬赏提问表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_bounties (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL,
+            author_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT DEFAULT '',
+            amount INTEGER NOT NULL DEFAULT 0,
+            status TEXT DEFAULT 'open',
+            winner_id INTEGER DEFAULT NULL,
+            winner_msg_id INTEGER DEFAULT NULL,
+            expires_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+            FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_bounties_room ON chat_bounties(room_id);
+        CREATE INDEX IF NOT EXISTS idx_bounties_status ON chat_bounties(status);
+    `);
+
+    // 课堂抢答/签到活动表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_activities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            title TEXT DEFAULT '',
+            content TEXT DEFAULT '{}',
+            status TEXT DEFAULT 'active',
+            duration INTEGER DEFAULT 60,
+            rewards TEXT DEFAULT '[]',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ended_at DATETIME,
+            FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_activities_room ON chat_activities(room_id);
+        CREATE INDEX IF NOT EXISTS idx_activities_status ON chat_activities(status);
+    `);
+
+    // 活动参与记录表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_activity_responses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            activity_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            answer TEXT DEFAULT '',
+            is_correct INTEGER DEFAULT 0,
+            rank_position INTEGER DEFAULT 0,
+            coins_earned INTEGER DEFAULT 0,
+            responded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (activity_id) REFERENCES chat_activities(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(activity_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_responses_activity ON chat_activity_responses(activity_id);
+    `);
+
+    // 消息打赏记录表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_tips (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id INTEGER NOT NULL,
+            from_id INTEGER NOT NULL,
+            to_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE,
+            FOREIGN KEY (from_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (to_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_tips_msg ON chat_tips(message_id);
+        CREATE INDEX IF NOT EXISTS idx_tips_to ON chat_tips(to_id);
+    `);
+
+    // 答疑排行榜统计表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_helper_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            answers_count INTEGER DEFAULT 0,
+            accepted_count INTEGER DEFAULT 0,
+            tips_received INTEGER DEFAULT 0,
+            bounties_won INTEGER DEFAULT 0,
+            quarter TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(user_id, quarter)
+        );
+        CREATE INDEX IF NOT EXISTS idx_helper_stats_quarter ON chat_helper_stats(quarter);
+    `);
+
+    // 兼容迁移：users 添加 level 列
+    try { db.exec("ALTER TABLE users ADD COLUMN level INTEGER DEFAULT 1"); } catch(e) {}
+
+    // ==================== 智能化班级与学生管理系统 ====================
+
+    // 学生危机预警表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS student_risk_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            alert_type TEXT NOT NULL,
+            severity TEXT DEFAULT 'medium',
+            detail TEXT DEFAULT '',
+            is_resolved INTEGER DEFAULT 0,
+            notified INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            resolved_at DATETIME,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_risk_alerts_student ON student_risk_alerts(student_id);
+        CREATE INDEX IF NOT EXISTS idx_risk_alerts_class ON student_risk_alerts(class_id, is_resolved);
+    `);
+
+    // 学生能力画像（五维雷达）
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS student_ability_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            ui_design INTEGER DEFAULT 50,
+            logic_design INTEGER DEFAULT 50,
+            code_quality INTEGER DEFAULT 50,
+            delivery_speed INTEGER DEFAULT 50,
+            creativity INTEGER DEFAULT 50,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            UNIQUE(student_id, class_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_ability_student ON student_ability_profiles(student_id);
+    `);
+
+    // 统一成绩册表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS gradebook (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL,
+            class_id INTEGER NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            score REAL NOT NULL,
+            max_score REAL DEFAULT 100,
+            weight REAL DEFAULT 1.0,
+            category TEXT DEFAULT 'homework',
+            recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_gradebook_student ON gradebook(student_id, class_id);
+        CREATE INDEX IF NOT EXISTS idx_gradebook_class ON gradebook(class_id);
+        CREATE INDEX IF NOT EXISTS idx_gradebook_source ON gradebook(source_type, source_id);
+    `);
+
+    // ==================== 即时作业系统（免批改）====================
+
+    // 即时测验/限时练表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS instant_quizzes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            quiz_type TEXT NOT NULL DEFAULT 'mcq',
+            time_limit INTEGER DEFAULT 300,
+            max_score INTEGER DEFAULT 100,
+            is_active INTEGER DEFAULT 0,
+            show_answers INTEGER DEFAULT 0,
+            auto_record INTEGER DEFAULT 1,
+            started_at DATETIME,
+            ended_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_quizzes_class ON instant_quizzes(class_id);
+        CREATE INDEX IF NOT EXISTS idx_quizzes_teacher ON instant_quizzes(teacher_id);
+    `);
+
+    // 测验题目表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS quiz_questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            quiz_id INTEGER NOT NULL,
+            question_type TEXT NOT NULL DEFAULT 'mcq',
+            title TEXT NOT NULL,
+            content TEXT DEFAULT '',
+            options TEXT DEFAULT '[]',
+            correct_answer TEXT NOT NULL,
+            code_template TEXT DEFAULT '',
+            test_cases TEXT DEFAULT '[]',
+            points INTEGER DEFAULT 10,
+            order_num INTEGER DEFAULT 0,
+            FOREIGN KEY (quiz_id) REFERENCES instant_quizzes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_questions_quiz ON quiz_questions(quiz_id);
+    `);
+
+    // 学生即时测验作答记录
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS quiz_responses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            quiz_id INTEGER NOT NULL,
+            question_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            answer TEXT DEFAULT '',
+            is_correct INTEGER DEFAULT 0,
+            score INTEGER DEFAULT 0,
+            time_spent INTEGER DEFAULT 0,
+            submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (quiz_id) REFERENCES instant_quizzes(id) ON DELETE CASCADE,
+            FOREIGN KEY (question_id) REFERENCES quiz_questions(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(question_id, student_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_responses_quiz ON quiz_responses(quiz_id, student_id);
+        CREATE INDEX IF NOT EXISTS idx_responses_student ON quiz_responses(student_id);
+    `);
+
+    // 代码填空作业表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS code_fill_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            teacher_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            language TEXT DEFAULT 'html',
+            code_template TEXT NOT NULL,
+            blanks TEXT NOT NULL DEFAULT '[]',
+            match_mode TEXT DEFAULT 'exact',
+            max_score INTEGER DEFAULT 100,
+            time_limit INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_code_fill_class ON code_fill_assignments(class_id);
+    `);
+
+    // 代码填空提交记录
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS code_fill_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            assignment_id INTEGER NOT NULL,
+            student_id INTEGER NOT NULL,
+            answers TEXT DEFAULT '[]',
+            score INTEGER DEFAULT 0,
+            max_score INTEGER DEFAULT 100,
+            is_correct INTEGER DEFAULT 0,
+            time_spent INTEGER DEFAULT 0,
+            submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (assignment_id) REFERENCES code_fill_assignments(id) ON DELETE CASCADE,
+            FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(assignment_id, student_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_code_fill_sub_assignment ON code_fill_submissions(assignment_id);
+        CREATE INDEX IF NOT EXISTS idx_code_fill_sub_student ON code_fill_submissions(student_id);
+    `);
+
+    // ==================== 分层分组引擎 ====================
+
+    // 分组策略配置
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS group_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_id INTEGER NOT NULL,
+            strategy TEXT NOT NULL DEFAULT 'free',
+            group_count INTEGER DEFAULT 4,
+            config TEXT DEFAULT '{}',
+            created_by INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_group_configs_class ON group_configs(class_id);
+    `);
+
+    // 兼容迁移：homework 添加作业大类字段
+    try { db.exec("ALTER TABLE homework ADD COLUMN category TEXT DEFAULT 'manual'"); } catch(e) {}
+    // 兼容迁移：homework 添加分组目标
+    try { db.exec("ALTER TABLE homework ADD COLUMN target_level TEXT DEFAULT 'all'"); } catch(e) {}
+
+    // 兼容迁移：classes 添加及格线配置
+    try { db.exec("ALTER TABLE classes ADD COLUMN pass_line INTEGER DEFAULT 60"); } catch(e) {}
+
+    // 种子：金币道具
+    seedCoinItems(db);
+
+    // 种子：金币任务
+    seedCoinMissions(db);
 
     // 创建/更新 admin 用户
     seedAdmin(db);
@@ -152,10 +1009,60 @@ function initDatabase() {
     // 初始化模板数据
     seedTemplates(db);
 
+    // 初始化示例课件（教师 + 项目 + 文件）
+    try {
+        const { seedSampleCourseware } = require('./seedCourseware');
+        seedSampleCourseware(db);
+    } catch (err) {
+        console.error('  ⚠️ 示例课件种子失败:', err.message);
+    }
+
     console.log('  ✅ 数据库初始化完成');
 }
 
 module.exports = { getDb, initDatabase };
+
+// ===== 金币道具种子 =====
+function seedCoinItems(db) {
+    const count = db.prepare('SELECT COUNT(*) as c FROM coin_items').get().c;
+    if (count > 0) return;
+
+    const items = [
+        { name: '迟交券', slug: 'late-pass', description: '使用后可延期1天提交作业，不扣分', price: 5, type: 'consumable', effect: '{"extend_days":1}', icon: '🎫' },
+        { name: '重做申请卡', slug: 'redo-card', description: '申请重做已批改的作业一次', price: 8, type: 'consumable', effect: '{"allow_redo":true}', icon: '🔄' },
+        { name: '个人主页彩虹边框', slug: 'rainbow-border', description: '个人主页展示炫酷彩虹边框', price: 15, type: 'decoration', effect: '{"border":"rainbow"}', icon: '🌈' },
+        { name: '代码高亮皮肤-暗夜紫', slug: 'theme-purple', description: '编辑器专属暗夜紫主题', price: 10, type: 'decoration', effect: '{"theme":"purple"}', icon: '💜' },
+        { name: '成绩免公示卡', slug: 'hide-score', description: '本次作业成绩不在排行榜公示', price: 3, type: 'consumable', effect: '{"hide_score":true}', icon: '🙈' },
+        { name: 'VIP徽章', slug: 'vip-badge', description: '个人主页显示VIP尊贵徽章', price: 20, type: 'decoration', effect: '{"badge":"vip"}', icon: '👑' }
+    ];
+
+    const insert = db.prepare('INSERT INTO coin_items (name, slug, description, price, type, effect, icon) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const item of items) {
+        insert.run(item.name, item.slug, item.description, item.price, item.type, item.effect, item.icon);
+    }
+}
+
+// ===== 金币任务种子 =====
+function seedCoinMissions(db) {
+    const count = db.prepare('SELECT COUNT(*) as c FROM coin_missions').get().c;
+    if (count > 0) return;
+
+    const missions = [
+        { name: '首登奖励', slug: 'first-login', description: '首次登录平台', reward: 10, type: 'once', condition_type: 'login', condition_value: 1, icon: '🎉' },
+        { name: '每日签到', slug: 'daily-login', description: '每天登录平台', reward: 1, type: 'daily', condition_type: 'login', condition_value: 1, icon: '📅' },
+        { name: '连续提交作业', slug: 'streak-submit', description: '连续3次准时提交作业', reward: 5, type: 'streak', condition_type: 'homework_submit', condition_value: 3, icon: '🔥' },
+        { name: '社区助人为乐', slug: 'help-others', description: '在社区回答问题被采纳为最佳答案', reward: 8, type: 'repeatable', condition_type: 'best_answer', condition_value: 1, icon: '💡' },
+        { name: '代码达人', slug: 'code-master', description: '单日编写超过100行代码', reward: 3, type: 'daily', condition_type: 'lines_coded', condition_value: 100, icon: '⌨️' },
+        { name: '互评积极分子', slug: 'active-reviewer', description: '完成5次作业互评', reward: 5, type: 'repeatable', condition_type: 'peer_review', condition_value: 5, icon: '📝' },
+        { name: '全勤出席', slug: 'full-attendance', description: '一周内所有签到均完成', reward: 10, type: 'weekly', condition_type: 'attendance', condition_value: 5, icon: '✅' },
+        { name: '部署达人', slug: 'deploy-master', description: '成功部署5个项目', reward: 10, type: 'once', condition_type: 'deploy', condition_value: 5, icon: '🚀' }
+    ];
+
+    const insert = db.prepare('INSERT INTO coin_missions (name, slug, description, reward, type, condition_type, condition_value, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    for (const m of missions) {
+        insert.run(m.name, m.slug, m.description, m.reward, m.type, m.condition_type, m.condition_value, m.icon);
+    }
+}
 
 // ===== 管理员种子账号 =====
 function seedAdmin(db) {

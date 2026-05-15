@@ -205,6 +205,97 @@ img {
     transition: var(--transition);
 }
 
+/* 导航栏附加 */
+.nav-links a.active {
+    color: var(--text-primary);
+}
+.nav-links a.active::after {
+    width: 100%;
+}
+.btn-nav-link {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+    text-decoration: none;
+}
+.btn-nav-link:hover {
+    color: var(--text-primary);
+    background: var(--bg-card);
+}
+.btn-nav-logout {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+.btn-nav-logout:hover {
+    color: #f87171;
+    opacity: 1;
+}
+.nav-chat-link {
+    font-size: 1.1rem !important;
+    text-decoration: none;
+}
+.nav-chat-badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+}
+.nav-user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.nav-username {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 用户角色标签 */
+.role-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.role-admin {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.role-teacher {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.role-student {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.role-user {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
 /* ============================================
    Hero 区域
    ============================================ */

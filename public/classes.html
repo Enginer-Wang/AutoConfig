@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>班级管理 - Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <style>
+        .cls-layout{display:flex;min-height:100vh;background:#0a0a1a}
+        .cls-sidebar{width:260px;background:rgba(15,15,35,.95);border-right:1px solid rgba(255,255,255,.06);padding:20px 0;position:fixed;top:0;bottom:0;overflow-y:auto;z-index:100}
+        .cls-sidebar .logo{display:flex;align-items:center;gap:10px;padding:0 20px 20px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:16px}
+        .cls-sidebar .logo-icon{font-size:1.5rem}
+        .cls-sidebar .logo-text{font-size:1.1rem;font-weight:700;color:#f1f5f9}
+        .cls-sidebar .logo-badge{font-size:.65rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:2px 8px;border-radius:10px;color:#fff;font-weight:600}
+        .cls-sidebar .nav-section{margin-bottom:8px}
+        .cls-sidebar .nav-label{font-size:.7rem;text-transform:uppercase;color:#475569;padding:8px 20px 4px;letter-spacing:1px}
+        .cls-sidebar .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;color:#94a3b8;font-size:.88rem;cursor:pointer;transition:all .2s;text-decoration:none;border-left:3px solid transparent}
+        .cls-sidebar .nav-item:hover{background:rgba(99,102,241,.08);color:#e2e8f0}
+        .cls-sidebar .nav-item.active{background:rgba(99,102,241,.12);color:#818cf8;border-left-color:#818cf8}
+        .cls-sidebar .nav-item .icon{font-size:1.1rem;width:24px;text-align:center}
+        .cls-sidebar .class-list{margin-top:8px}
+        .cls-sidebar .class-item{display:flex;align-items:center;gap:8px;padding:8px 20px 8px 32px;color:#94a3b8;font-size:.82rem;cursor:pointer;transition:all .15s;border-left:3px solid transparent}
+        .cls-sidebar .class-item:hover{background:rgba(99,102,241,.06);color:#e2e8f0}
+        .cls-sidebar .class-item.active{color:#818cf8;border-left-color:#818cf8;background:rgba(99,102,241,.08)}
+        .cls-sidebar .class-item .dot{width:8px;height:8px;border-radius:50%;background:#6366f1;flex-shrink:0}
+        .cls-sidebar .class-item .co-dot{background:#10b981}
+        .cls-main{flex:1;margin-left:260px;padding:24px 32px;min-height:100vh}
+        .cls-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+        .cls-header h1{font-size:1.4rem;color:#f1f5f9;font-weight:700}
+        .cls-header .user-info{display:flex;align-items:center;gap:12px;color:#94a3b8;font-size:.88rem}
+
+        /* Stats */
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+        .stat-card{background:rgba(30,30,60,.5);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;transition:all .3s}
+        .stat-card:hover{border-color:rgba(99,102,241,.3);transform:translateY(-2px)}
+        .stat-card .stat-icon{font-size:1.5rem;margin-bottom:8px}
+        .stat-card .stat-value{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .stat-card .stat-label{font-size:.8rem;color:#64748b;margin-top:4px}
+
+        /* Panel */
+        .panel{background:rgba(30,30,60,.5);border:1px solid rgba(255,255,255,.06);border-radius:12px;margin-bottom:24px}
+        .panel-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;gap:12px}
+        .panel-header h2{font-size:1.1rem;color:#f1f5f9}
+        .panel-body{padding:16px 20px}
+        .panel-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+        /* Table */
+        .data-table{width:100%;border-collapse:collapse;font-size:.85rem}
+        .data-table th{text-align:left;padding:10px 12px;color:#64748b;font-weight:600;font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,.06)}
+        .data-table td{padding:12px;color:#cbd5e1;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle}
+        .data-table tr:hover td{background:rgba(99,102,241,.04)}
+        .data-table .username{color:#818cf8;font-weight:600}
+
+        /* Badges */
+        .badge{font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block}
+        .badge-teacher{background:rgba(99,102,241,.15);color:#a5b4fc}
+        .badge-student{background:rgba(34,197,94,.15);color:#4ade80}
+        .badge-co-teacher{background:rgba(245,158,11,.15);color:#fbbf24}
+        .badge-owner{background:rgba(239,68,68,.15);color:#f87171}
+
+        /* Progress */
+        .progress-bar{width:100%;height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+        .progress-fill{height:100%;border-radius:3px;transition:width .5s ease}
+        .progress-good{background:linear-gradient(90deg,#10b981,#34d399)}
+        .progress-mid{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+        .progress-low{background:linear-gradient(90deg,#ef4444,#f87171)}
+
+        /* Chart area */
+        .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+        .chart-card{background:rgba(30,30,60,.5);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px}
+        .chart-card h3{font-size:.95rem;color:#f1f5f9;margin-bottom:16px}
+        .bar-chart{display:flex;align-items:flex-end;gap:8px;height:140px;padding-top:8px}
+        .bar-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+        .bar-item .bar{width:100%;min-width:20px;border-radius:4px 4px 0 0;transition:height .5s ease;cursor:pointer;position:relative}
+        .bar-item .bar:hover{opacity:.8}
+        .bar-item .bar-label{font-size:.65rem;color:#64748b;text-align:center;white-space:nowrap}
+        .bar-item .bar-value{font-size:.7rem;color:#cbd5e1;font-weight:600}
+        .donut-chart{display:flex;align-items:center;gap:20px}
+        .donut-ring{width:120px;height:120px;position:relative}
+        .donut-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+        .donut-ring .center-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column}
+        .donut-ring .center-value{font-size:1.4rem;font-weight:800;color:#f1f5f9}
+        .donut-ring .center-label{font-size:.7rem;color:#64748b}
+        .donut-legend{display:flex;flex-direction:column;gap:6px}
+        .donut-legend-item{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#cbd5e1}
+        .donut-legend-item .dot{width:10px;height:10px;border-radius:2px}
+
+        /* Buttons */
+        .btn{padding:6px 14px;border:none;border-radius:8px;font-size:.8rem;cursor:pointer;font-family:inherit;transition:all .2s;display:inline-flex;align-items:center;gap:4px}
+        .btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff}
+        .btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+        .btn-success{background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.2)}
+        .btn-warning{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.2)}
+        .btn-danger{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.2)}
+        .btn-sm{padding:4px 10px;font-size:.75rem}
+        .btn-ghost{background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,.08)}
+        .btn-ghost:hover{border-color:#818cf8;color:#818cf8}
+
+        /* Forms */
+        .form-input{width:100%;padding:8px 12px;background:rgba(15,15,35,.8);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:.85rem;font-family:inherit;outline:none;box-sizing:border-box}
+        .form-input:focus{border-color:#6366f1}
+        .form-input-sm{padding:6px 10px;font-size:.8rem;width:auto;min-width:160px}
+        .form-select{padding:6px 10px;background:rgba(15,15,35,.8);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:.8rem;font-family:inherit;outline:none;cursor:pointer}
+        .form-group{margin-bottom:14px}
+        .form-group label{display:block;font-size:.8rem;color:#94a3b8;margin-bottom:6px}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+        /* Modal */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center}
+        .modal-overlay.show{display:flex}
+        .modal{background:#1a1a2e;border:1px solid rgba(255,255,255,.1);border-radius:16px;width:90%;max-width:520px;max-height:85vh;overflow-y:auto}
+        .modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+        .modal-header h3{font-size:1.1rem;color:#f1f5f9}
+        .modal-close{background:none;border:none;color:#94a3b8;font-size:1.3rem;cursor:pointer;padding:4px}
+        .modal-close:hover{color:#f87171}
+        .modal-body{padding:20px}
+        .modal-footer{padding:16px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:flex-end;gap:10px}
+
+        /* Student detail card */
+        .student-detail{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:start}
+        .student-avatar-lg{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;color:#fff}
+        .student-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .student-info-item{padding:10px;background:rgba(255,255,255,.03);border-radius:8px}
+        .student-info-item .label{font-size:.72rem;color:#64748b;margin-bottom:2px}
+        .student-info-item .value{font-size:.9rem;color:#e2e8f0;font-weight:600}
+
+        /* Empty & Loading */
+        .empty-msg{text-align:center;color:#64748b;padding:40px;font-size:.9rem}
+        .section-content{display:none}
+        .section-content.active{display:block}
+        .actions-cell{display:flex;gap:6px;flex-wrap:wrap}
+
+        /* Activity indicator */
+        .activity-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+        .activity-active{background:#10b981}
+        .activity-inactive{background:#64748b}
+
+        @media(max-width:900px){
+            .cls-sidebar{display:none}
+            .cls-main{margin-left:0}
+            .chart-grid{grid-template-columns:1fr}
+            .student-detail{grid-template-columns:1fr}
+            .form-row{grid-template-columns:1fr}
+        }
+    </style>
+</head>
+<body>
+    <div class="cls-layout">
+        <!-- 侧边栏 -->
+        <aside class="cls-sidebar">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Autoconfig</span>
+                <span class="logo-badge">班级</span>
+            </div>
+            <div class="nav-section">
+                <div class="nav-label">导航</div>
+                <a class="nav-item active" onclick="showSection('overview')"><span class="icon">📊</span> 总览</a>
+                <a class="nav-item" onclick="showSection('members')"><span class="icon">👥</span> 学生管理</a>
+                <a class="nav-item" onclick="showSection('announcements')"><span class="icon">📢</span> 班级公告</a>
+                <a class="nav-item" onclick="showSection('analytics')"><span class="icon">📈</span> 数据分析</a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-label">我的班级</div>
+                <div class="class-list" id="sidebarClasses">
+                    <div style="padding:12px 20px;color:#475569;font-size:.8rem">加载中...</div>
+                </div>
+            </div>
+            <div class="nav-section" style="margin-top:auto;border-top:1px solid rgba(255,255,255,.06);padding-top:12px">
+                <a class="nav-item" href="/dashboard"><span class="icon">🏠</span> 返回控制台</a>
+                <a class="nav-item" href="/homework"><span class="icon">📝</span> 作业管理</a>
+                <a class="nav-item" onclick="logout()" style="cursor:pointer"><span class="icon">🚪</span> 退出登录</a>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="cls-main">
+            <div class="cls-header">
+                <h1 id="pageTitle">📊 班级总览</h1>
+                <div class="user-info">
+                    <span id="headerUser">-</span>
+                    <button class="btn btn-primary" onclick="openModal('createModal')">➕ 创建班级</button>
+                    <button class="btn btn-ghost" onclick="openModal('joinModal')">🔑 加入班级</button>
+                </div>
+            </div>
+
+            <!-- 总览 -->
+            <div class="section-content active" id="section-overview">
+                <div class="stats-grid" id="overviewStats"></div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📚 班级列表</h2>
+                        <div class="panel-toolbar">
+                            <input class="form-input form-input-sm" id="classSearch" placeholder="搜索班级..." oninput="filterClasses()">
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>班级</th><th>学科</th><th>学段</th><th>学生</th><th>作业</th><th>平均分</th><th>我的身份</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="classesTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 学生管理 -->
+            <div class="section-content" id="section-members">
+                <div id="membersContent">
+                    <div class="empty-msg">请从侧边栏选择一个班级查看学生</div>
+                </div>
+            </div>
+
+            <!-- 数据分析 -->
+            <div class="section-content" id="section-announcements">
+                <div id="announcementsContent">
+                    <div class="empty-msg">请从侧边栏选择一个班级查看公告</div>
+                </div>
+            </div>
+
+            <!-- 数据分析 -->
+            <div class="section-content" id="section-analytics">
+                <div id="analyticsContent">
+                    <div class="empty-msg">请从侧边栏选择一个班级查看分析</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 创建班级弹窗 -->
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>➕ 创建新班级</h3>
+                <button class="modal-close" onclick="closeModal('createModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>班级名称 *</label>
+                    <input type="text" class="form-input" id="className" placeholder="如：高一(3)班物理" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>班级描述</label>
+                    <input type="text" class="form-input" id="classDesc" placeholder="可选描述" maxlength="200">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>学段</label>
+                        <select class="form-input" id="classLevel">
+                            <option value="">--选择--</option>
+                            <option value="elementary">小学</option>
+                            <option value="middle">初中</option>
+                            <option value="high">高中</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>学科</label>
+                        <input type="text" class="form-input" id="classSubject" placeholder="如：物理" maxlength="20">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('createModal')">取消</button>
+                <button class="btn btn-primary" onclick="createClass()">创建班级</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加入班级弹窗 -->
+    <div class="modal-overlay" id="joinModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🔑 加入班级</h3>
+                <button class="modal-close" onclick="closeModal('joinModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>邀请码</label>
+                    <input type="text" class="form-input" id="inviteCode" placeholder="输入6位邀请码" maxlength="6" style="text-transform:uppercase;letter-spacing:3px;text-align:center;font-size:1.3rem;padding:14px">
+                </div>
+                <p style="font-size:.82rem;color:#64748b;margin-top:8px">教师加入后将成为协作教师，学生加入后成为班级学生</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('joinModal')">取消</button>
+                <button class="btn btn-primary" onclick="joinClass()">加入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑班级弹窗 -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✏️ 编辑班级</h3>
+                <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>班级名称</label>
+                    <input type="text" class="form-input" id="editClassName" maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>班级描述</label>
+                    <input type="text" class="form-input" id="editClassDesc" maxlength="200">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>学段</label>
+                        <select class="form-input" id="editClassLevel">
+                            <option value="">--选择--</option>
+                            <option value="elementary">小学</option>
+                            <option value="middle">初中</option>
+                            <option value="high">高中</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>学科</label>
+                        <input type="text" class="form-input" id="editClassSubject" maxlength="20">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeModal('editModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEditClass()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 学生详情弹窗 -->
+    <div class="modal-overlay" id="studentModal">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-header">
+                <h3>👤 学生详情</h3>
+                <button class="modal-close" onclick="closeModal('studentModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="studentDetailContent"></div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        let currentUser = null;
+        let allClasses = [];
+        let currentClassId = null;
+        let currentClassData = null;
+        let editingClassId = null;
+
+        (async () => {
+            currentUser = await checkAuth();
+            if (!currentUser) { window.location.href = '/login'; return; }
+            document.getElementById('headerUser').textContent = currentUser.username;
+            // 学生隐藏创建按钮，只显示加入
+            if (currentUser.role !== 'teacher' && currentUser.role !== 'admin') {
+                const createBtn = document.querySelector('[onclick="openModal(\'createModal\')"]');
+                if (createBtn) createBtn.style.display = 'none';
+            }
+            await loadClasses();
+        })();
+
+        // ========= 数据加载 =========
+        async function loadClasses() {
+            try {
+                const data = await api('/api/classes/my');
+                allClasses = data.classes;
+                renderSidebar();
+                renderOverview();
+                if (allClasses.length > 0 && !currentClassId) {
+                    selectClass(allClasses[0].id);
+                }
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function renderSidebar() {
+            const el = document.getElementById('sidebarClasses');
+            if (!allClasses.length) {
+                el.innerHTML = '<div style="padding:12px 20px;color:#475569;font-size:.8rem">暂无班级</div>';
+                return;
+            }
+            el.innerHTML = allClasses.map(c => `
+                <div class="class-item ${c.id === currentClassId ? 'active' : ''}" onclick="selectClass(${c.id})">
+                    <span class="dot ${c.my_role === 'co_teacher' ? 'co-dot' : ''}"></span>
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>
+                    ${c.my_role === 'co_teacher' ? '<span style="font-size:.65rem;color:#fbbf24">协作</span>' : ''}
+                </div>
+            `).join('');
+        }
+
+        function renderOverview() {
+            const totalStudents = allClasses.reduce((s, c) => s + (c.member_count || 0), 0);
+            document.getElementById('overviewStats').innerHTML = `
+                <div class="stat-card"><div class="stat-icon">📚</div><div class="stat-value">${allClasses.length}</div><div class="stat-label">班级总数</div></div>
+                <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">${totalStudents}</div><div class="stat-label">学生总数</div></div>
+                <div class="stat-card"><div class="stat-icon">👨‍🏫</div><div class="stat-value">${allClasses.filter(c => c.my_role === 'owner').length}</div><div class="stat-label">我创建的</div></div>
+                <div class="stat-card"><div class="stat-icon">🤝</div><div class="stat-value">${allClasses.filter(c => c.my_role === 'co_teacher').length}</div><div class="stat-label">协作管理</div></div>
+            `;
+            renderClassesTable(allClasses);
+        }
+
+        function renderClassesTable(classes) {
+            const levelMap = { elementary: '小学', middle: '初中', high: '高中' };
+            const roleMap = { owner: '创建者', co_teacher: '协作教师', student: '学生' };
+            document.getElementById('classesTable').innerHTML = classes.length ? classes.map(c => `
+                <tr>
+                    <td class="username" style="cursor:pointer" onclick="selectClass(${c.id})">${esc(c.name)}</td>
+                    <td>${esc(c.subject || '-')}</td>
+                    <td>${levelMap[c.school_level] || '-'}</td>
+                    <td>${c.member_count || 0}</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td><span class="badge badge-${c.my_role === 'owner' ? 'owner' : c.my_role === 'co_teacher' ? 'co-teacher' : 'student'}">${roleMap[c.my_role] || c.my_role}</span></td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-ghost" onclick="selectClass(${c.id})">管理</button>
+                        ${c.my_role === 'owner' ? `<button class="btn btn-sm btn-warning" onclick="editClass(${c.id})">编辑</button><button class="btn btn-sm btn-danger" onclick="deleteClass(${c.id})">删除</button>` : ''}
+                    </td>
+                </tr>
+            `).join('') : '<tr><td colspan="8" class="empty-msg">暂无班级数据</td></tr>';
+        }
+
+        function filterClasses() {
+            const q = document.getElementById('classSearch').value.trim().toLowerCase();
+            const filtered = q ? allClasses.filter(c => c.name.toLowerCase().includes(q) || (c.subject || '').toLowerCase().includes(q)) : allClasses;
+            renderClassesTable(filtered);
+        }
+
+        // ========= 班级选择与详情 =========
+        async function selectClass(classId) {
+            currentClassId = classId;
+            renderSidebar();
+            try {
+                const data = await api('/api/classes/' + classId);
+                currentClassData = data;
+                renderMembersSection(data);
+                loadAnalytics(classId);
+                loadAnnouncements(classId);
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        function renderMembersSection(data) {
+            const { class: cls, members, stats, isTeacher } = data;
+            const students = members.filter(m => m.class_role === 'student');
+            const coTeachers = members.filter(m => m.class_role === 'co_teacher');
+
+            let html = `
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">${stats.total_members}</div><div class="stat-label">学生人数</div></div>
+                    <div class="stat-card"><div class="stat-icon">👨‍🏫</div><div class="stat-value">${stats.co_teachers}</div><div class="stat-label">协作教师</div></div>
+                    <div class="stat-card"><div class="stat-icon">📝</div><div class="stat-value">${stats.total_homework}</div><div class="stat-label">已发作业</div></div>
+                    <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-value">${stats.avg_score != null ? stats.avg_score : '-'}</div><div class="stat-label">班级均分</div></div>
+                    <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">${stats.completion_rate}%</div><div class="stat-label">提交率</div></div>
+                </div>
+                <div class="panel" style="margin-bottom:16px">
+                    <div class="panel-header">
+                        <h2>📋 班级信息</h2>
+                        <div class="panel-toolbar">
+                            <span style="font-size:.82rem;color:#94a3b8">邀请码：<code style="background:rgba(99,102,241,.1);color:#818cf8;padding:2px 8px;border-radius:4px;font-size:.9rem;letter-spacing:2px" id="classInviteCode">${cls.invite_code}</code></span>
+                            ${isTeacher ? `<button class="btn btn-sm btn-ghost" onclick="regenerateCode(${cls.id})">🔄 重新生成</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 协作教师列表
+            if (coTeachers.length > 0) {
+                html += `<div class="panel" style="margin-bottom:16px"><div class="panel-header"><h2>👨‍🏫 协作教师 (${coTeachers.length})</h2></div><div class="panel-body"><table class="data-table"><thead><tr><th>教师</th><th>加入时间</th><th>操作</th></tr></thead><tbody>`;
+                html += coTeachers.map(m => `<tr>
+                    <td class="username">${esc(m.username)}</td>
+                    <td>${formatDate(m.joined_at)}</td>
+                    <td class="actions-cell">${isTeacher ? `<button class="btn btn-sm btn-danger" onclick="removeMember(${cls.id},${m.id})">移除</button>` : ''}</td>
+                </tr>`).join('');
+                html += `</tbody></table></div></div>`;
+            }
+
+            // 学生列表
+            html += `
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>👥 学生列表 (${students.length})</h2>
+                        <div class="panel-toolbar">
+                            <input class="form-input form-input-sm" id="memberSearch" placeholder="搜索学生..." oninput="filterMembers()">
+                            <select class="form-select" id="memberSort" onchange="filterMembers()">
+                                <option value="name">按姓名</option>
+                                <option value="score_desc">按均分↓</option>
+                                <option value="score_asc">按均分↑</option>
+                                <option value="submissions">按提交数</option>
+                                <option value="joined">按加入时间</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table" id="memberTableWrap">
+                            <thead>
+                                <tr><th>状态</th><th>学生</th><th>学校</th><th>提交</th><th>均分</th><th>最高分</th><th>提交率</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="membersTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('membersContent').innerHTML = html;
+            renderMembersTable(students);
+        }
+
+        function renderMembersTable(students) {
+            const totalHw = currentClassData?.stats?.total_homework || 1;
+            document.getElementById('membersTable').innerHTML = students.length ? students.map(m => {
+                const rate = totalHw > 0 ? Math.round((m.submission_count / totalHw) * 100) : 0;
+                const progressClass = rate >= 80 ? 'progress-good' : rate >= 50 ? 'progress-mid' : 'progress-low';
+                return `<tr>
+                    <td><span class="activity-dot ${m.submission_count > 0 ? 'activity-active' : 'activity-inactive'}"></span></td>
+                    <td><span class="username" style="cursor:pointer" onclick="viewStudent(${m.id})">${esc(m.username)}</span></td>
+                    <td>${esc(m.school || '-')}</td>
+                    <td>${m.submission_count || 0}/${totalHw}</td>
+                    <td style="font-weight:600;color:${m.avg_score >= 80 ? '#4ade80' : m.avg_score >= 60 ? '#fbbf24' : m.avg_score != null ? '#f87171' : '#64748b'}">${m.avg_score != null ? m.avg_score : '-'}</td>
+                    <td>${m.max_score != null ? m.max_score : '-'}</td>
+                    <td><div class="progress-bar"><div class="progress-fill ${progressClass}" style="width:${rate}%"></div></div><span style="font-size:.7rem;color:#64748b">${rate}%</span></td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-ghost" onclick="viewStudent(${m.id})">详情</button>
+                        ${currentClassData?.isTeacher ? `<button class="btn btn-sm btn-danger" onclick="removeMember(${currentClassId},${m.id})">移除</button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="8" class="empty-msg">暂无学生</td></tr>';
+        }
+
+        function filterMembers() {
+            if (!currentClassData) return;
+            const q = (document.getElementById('memberSearch')?.value || '').trim().toLowerCase();
+            const sort = document.getElementById('memberSort')?.value || 'name';
+            let students = currentClassData.members.filter(m => m.class_role === 'student');
+            if (q) students = students.filter(m => m.username.toLowerCase().includes(q) || (m.school || '').toLowerCase().includes(q));
+            switch (sort) {
+                case 'score_desc': students.sort((a, b) => (b.avg_score || 0) - (a.avg_score || 0)); break;
+                case 'score_asc': students.sort((a, b) => (a.avg_score || 0) - (b.avg_score || 0)); break;
+                case 'submissions': students.sort((a, b) => (b.submission_count || 0) - (a.submission_count || 0)); break;
+                case 'joined': students.sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at)); break;
+                default: students.sort((a, b) => a.username.localeCompare(b.username));
+            }
+            renderMembersTable(students);
+        }
+
+        function viewStudent(userId) {
+            const m = currentClassData?.members?.find(x => x.id === userId);
+            if (!m) return;
+            const totalHw = currentClassData?.stats?.total_homework || 0;
+            const rate = totalHw > 0 ? Math.round((m.submission_count / totalHw) * 100) : 0;
+            document.getElementById('studentDetailContent').innerHTML = `
+                <div class="student-detail">
+                    <div class="student-avatar-lg">${m.username[0].toUpperCase()}</div>
+                    <div>
+                        <h3 style="color:#f1f5f9;margin-bottom:4px">${esc(m.username)}</h3>
+                        <p style="color:#64748b;font-size:.85rem;margin-bottom:12px">${esc(m.bio || '暂无简介')}</p>
+                        <div class="student-info-grid">
+                            <div class="student-info-item"><div class="label">邮箱</div><div class="value">${esc(m.email || '-')}</div></div>
+                            <div class="student-info-item"><div class="label">学校</div><div class="value">${esc(m.school || '-')}</div></div>
+                            <div class="student-info-item"><div class="label">平均分</div><div class="value" style="color:${m.avg_score >= 80 ? '#4ade80' : m.avg_score >= 60 ? '#fbbf24' : '#f87171'}">${m.avg_score != null ? m.avg_score : '-'}</div></div>
+                            <div class="student-info-item"><div class="label">最高分</div><div class="value">${m.max_score != null ? m.max_score : '-'}</div></div>
+                            <div class="student-info-item"><div class="label">提交次数</div><div class="value">${m.submission_count || 0} / ${totalHw}</div></div>
+                            <div class="student-info-item"><div class="label">提交率</div><div class="value">${rate}%</div></div>
+                            <div class="student-info-item"><div class="label">项目数</div><div class="value">${m.project_count || 0}</div></div>
+                            <div class="student-info-item"><div class="label">金币</div><div class="value" style="color:#eab308">${m.coins || 0} 🪙</div></div>
+                            <div class="student-info-item"><div class="label">注册时间</div><div class="value">${formatDate(m.register_time)}</div></div>
+                            <div class="student-info-item"><div class="label">加入班级</div><div class="value">${formatDate(m.joined_at)}</div></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            openModal('studentModal');
+        }
+
+        // ========= 班级公告 =========
+        async function loadAnnouncements(classId) {
+            try {
+                const data = await api('/api/classes/' + classId + '/announcements');
+                renderAnnouncements(data.announcements, classId);
+            } catch {
+                document.getElementById('announcementsContent').innerHTML = '<div class="empty-msg">加载公告失败</div>';
+            }
+        }
+
+        function renderAnnouncements(list, classId) {
+            const el = document.getElementById('announcementsContent');
+            const isTeacher = currentUser && (currentUser.role === 'teacher' || currentUser.role === 'admin');
+
+            let html = '';
+            if (isTeacher) {
+                html += `
+                    <div style="margin-bottom:16px;display:flex;gap:10px;align-items:center">
+                        <input type="text" class="form-input" id="annTitle" placeholder="公告标题" style="flex:1;padding:8px 12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:.88rem">
+                        <select class="form-input" id="annPriority" style="width:auto;padding:8px 12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:.85rem">
+                            <option value="normal">普通</option>
+                            <option value="urgent">紧急</option>
+                        </select>
+                        <button class="btn btn-primary" style="padding:8px 16px;font-size:.85rem;white-space:nowrap" onclick="postAnnouncement(${classId})">发布</button>
+                    </div>
+                    <textarea class="form-input" id="annContent" placeholder="公告内容（选填）" style="width:100%;padding:8px 12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:.85rem;min-height:60px;resize:vertical;margin-bottom:16px;font-family:inherit"></textarea>
+                `;
+            }
+
+            if (!list.length) {
+                html += '<div class="empty-msg">暂无公告</div>';
+            } else {
+                html += list.map(a => `
+                    <div style="background:var(--bg-card);border:1px solid ${a.priority === 'urgent' ? 'rgba(239,68,68,.3)' : 'var(--border)'};border-radius:10px;padding:14px 18px;margin-bottom:10px">
+                        <div style="display:flex;align-items:center;justify-content:space-between">
+                            <div style="font-weight:600;color:var(--text-primary);font-size:.92rem">
+                                ${a.priority === 'urgent' ? '<span style="color:#f87171">🔴 </span>' : ''}${esc(a.title)}
+                            </div>
+                            ${(isTeacher && a.teacher_id === currentUser.id) || currentUser.role === 'admin' ? `<button style="background:none;border:none;color:#f87171;cursor:pointer;font-size:.8rem" onclick="deleteAnnouncement(${classId}, ${a.id})">删除</button>` : ''}
+                        </div>
+                        ${a.content ? `<div style="color:var(--text-secondary);font-size:.84rem;margin-top:6px;line-height:1.5">${esc(a.content)}</div>` : ''}
+                        <div style="font-size:.72rem;color:var(--text-muted);margin-top:6px">${esc(a.teacher_name)} · ${formatDate(a.created_at)}</div>
+                    </div>
+                `).join('');
+            }
+
+            el.innerHTML = html;
+        }
+
+        async function postAnnouncement(classId) {
+            const title = document.getElementById('annTitle').value.trim();
+            const content = document.getElementById('annContent').value.trim();
+            const priority = document.getElementById('annPriority').value;
+            if (!title) { showToast('请输入公告标题', 'error'); return; }
+            try {
+                await api('/api/classes/' + classId + '/announcements', { method: 'POST', body: { title, content, priority } });
+                showToast('公告发布成功', 'success');
+                loadAnnouncements(classId);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function deleteAnnouncement(classId, annId) {
+            if (!confirm('确定删除这条公告？')) return;
+            try {
+                await api('/api/classes/' + classId + '/announcements/' + annId, { method: 'DELETE' });
+                showToast('公告已删除', 'success');
+                loadAnnouncements(classId);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        // ========= 数据分析可视化 =========
+        async function loadAnalytics(classId) {
+            try {
+                const data = await api('/api/classes/' + classId + '/analytics');
+                renderAnalytics(data);
+            } catch {
+                document.getElementById('analyticsContent').innerHTML = '<div class="empty-msg">暂无分析数据</div>';
+            }
+        }
+
+        function renderAnalytics(data) {
+            const { scoreDistribution, homeworkTrend, recentActivity } = data;
+            const colors = { '优秀': '#10b981', '良好': '#6366f1', '中等': '#f59e0b', '及格': '#eab308', '不及格': '#ef4444' };
+            const totalScores = scoreDistribution.reduce((s, d) => s + d.count, 0);
+
+            // 成绩分布环形图
+            let donutHtml = '';
+            if (totalScores > 0) {
+                let offset = 0;
+                const circumference = 2 * Math.PI * 45;
+                const segments = scoreDistribution.map(d => {
+                    const pct = d.count / totalScores;
+                    const dashArray = `${pct * circumference} ${circumference}`;
+                    const seg = `<circle cx="50" cy="50" r="45" fill="none" stroke="${colors[d.grade_range] || '#6366f1'}" stroke-width="10" stroke-dasharray="${dashArray}" stroke-dashoffset="${-offset}" />`;
+                    offset += pct * circumference;
+                    return seg;
+                }).join('');
+
+                donutHtml = `
+                    <div class="donut-chart">
+                        <div class="donut-ring">
+                            <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="10" />${segments}</svg>
+                            <div class="center-text"><div class="center-value">${totalScores}</div><div class="center-label">总评分数</div></div>
+                        </div>
+                        <div class="donut-legend">
+                            ${scoreDistribution.map(d => `<div class="donut-legend-item"><div class="dot" style="background:${colors[d.grade_range] || '#6366f1'}"></div>${d.grade_range}: ${d.count} (${Math.round(d.count/totalScores*100)}%)</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                donutHtml = '<div class="empty-msg">暂无成绩数据</div>';
+            }
+
+            // 作业平均分趋势柱状图
+            let trendHtml = '';
+            if (homeworkTrend.length > 0) {
+                const maxScore = 100;
+                trendHtml = `<div class="bar-chart">${homeworkTrend.map(h => {
+                    const height = h.avg_score ? Math.max((h.avg_score / maxScore) * 130, 8) : 8;
+                    const color = h.avg_score >= 80 ? '#10b981' : h.avg_score >= 60 ? '#f59e0b' : h.avg_score ? '#ef4444' : '#334155';
+                    return `<div class="bar-item"><div class="bar-value">${h.avg_score || '-'}</div><div class="bar" style="height:${height}px;background:${color}" title="${esc(h.title)}: 均分${h.avg_score || 0}, ${h.submission_count}人提交"></div><div class="bar-label">${esc(h.title.length > 4 ? h.title.slice(0, 4) + '..' : h.title)}</div></div>`;
+                }).join('')}</div>`;
+            } else {
+                trendHtml = '<div class="empty-msg">暂无作业数据</div>';
+            }
+
+            // 学生活跃度
+            let activityHtml = '';
+            if (recentActivity.length > 0) {
+                const maxSub = Math.max(...recentActivity.map(a => a.recent_submissions), 1);
+                activityHtml = `<div class="bar-chart" style="height:100px">${recentActivity.slice(0, 12).map(a => {
+                    const height = Math.max((a.recent_submissions / maxSub) * 90, 4);
+                    return `<div class="bar-item"><div class="bar-value">${a.recent_submissions}</div><div class="bar" style="height:${height}px;background:${a.recent_submissions > 0 ? '#6366f1' : '#334155'}" title="${esc(a.username)}"></div><div class="bar-label">${esc(a.username.slice(0, 3))}</div></div>`;
+                }).join('')}</div>`;
+            } else {
+                activityHtml = '<div class="empty-msg">暂无活跃数据</div>';
+            }
+
+            document.getElementById('analyticsContent').innerHTML = `
+                <div class="chart-grid">
+                    <div class="chart-card"><h3>📊 成绩分布</h3>${donutHtml}</div>
+                    <div class="chart-card"><h3>📈 作业均分趋势</h3>${trendHtml}</div>
+                </div>
+                <div class="chart-grid">
+                    <div class="chart-card"><h3>🔥 近7天活跃度</h3>${activityHtml}</div>
+                    <div class="chart-card"><h3>📋 班级概况</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                            <div class="student-info-item"><div class="label">总作业数</div><div class="value">${homeworkTrend.length}</div></div>
+                            <div class="student-info-item"><div class="label">总评分数</div><div class="value">${totalScores}</div></div>
+                            <div class="student-info-item"><div class="label">活跃学生</div><div class="value">${recentActivity.filter(a => a.recent_submissions > 0).length}/${recentActivity.length}</div></div>
+                            <div class="student-info-item"><div class="label">平均提交</div><div class="value">${homeworkTrend.length > 0 ? Math.round(homeworkTrend.reduce((s, h) => s + h.submission_count, 0) / homeworkTrend.length) : 0}人/次</div></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ========= CRUD 操作 =========
+        async function createClass() {
+            const name = document.getElementById('className').value.trim();
+            const description = document.getElementById('classDesc').value.trim();
+            const schoolLevel = document.getElementById('classLevel').value;
+            const subject = document.getElementById('classSubject').value.trim();
+            if (!name) { showToast('请输入班级名称', 'error'); return; }
+            try {
+                const data = await api('/api/classes/create', { method: 'POST', body: { name, description, schoolLevel, subject } });
+                showToast(`班级「${data.class.name}」创建成功！邀请码：${data.class.invite_code}`, 'success');
+                closeModal('createModal');
+                document.getElementById('className').value = '';
+                document.getElementById('classDesc').value = '';
+                await loadClasses();
+                selectClass(data.class.id);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function joinClass() {
+            const code = document.getElementById('inviteCode').value.trim();
+            if (!code) { showToast('请输入邀请码', 'error'); return; }
+            try {
+                const data = await api('/api/classes/join', { method: 'POST', body: { inviteCode: code } });
+                showToast(`成功加入班级「${data.class.name}」，身份：${data.role === 'co_teacher' ? '协作教师' : '学生'}`, 'success');
+                closeModal('joinModal');
+                document.getElementById('inviteCode').value = '';
+                await loadClasses();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function editClass(classId) {
+            editingClassId = classId;
+            const c = allClasses.find(x => x.id === classId);
+            if (!c) return;
+            document.getElementById('editClassName').value = c.name;
+            document.getElementById('editClassDesc').value = c.description || '';
+            document.getElementById('editClassLevel').value = c.school_level || '';
+            document.getElementById('editClassSubject').value = c.subject || '';
+            openModal('editModal');
+        }
+
+        async function saveEditClass() {
+            const name = document.getElementById('editClassName').value.trim();
+            const description = document.getElementById('editClassDesc').value.trim();
+            const schoolLevel = document.getElementById('editClassLevel').value;
+            const subject = document.getElementById('editClassSubject').value.trim();
+            if (!name) { showToast('班级名称不能为空', 'error'); return; }
+            try {
+                await api('/api/classes/' + editingClassId, { method: 'PUT', body: { name, description, schoolLevel, subject } });
+                showToast('班级信息已更新', 'success');
+                closeModal('editModal');
+                await loadClasses();
+                if (currentClassId === editingClassId) selectClass(editingClassId);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function deleteClass(classId) {
+            if (!confirm('确定删除该班级？所有成员、作业数据将一并删除，不可恢复。')) return;
+            try {
+                await api('/api/classes/' + classId, { method: 'DELETE' });
+                showToast('班级已删除', 'success');
+                if (currentClassId === classId) currentClassId = null;
+                await loadClasses();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function removeMember(classId, userId) {
+            if (!confirm('确定移除该成员？')) return;
+            try {
+                await api(`/api/classes/${classId}/member/${userId}`, { method: 'DELETE' });
+                showToast('成员已移除', 'success');
+                selectClass(classId);
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function regenerateCode(classId) {
+            if (!confirm('重新生成邀请码后，旧邀请码将失效')) return;
+            try {
+                const data = await api('/api/classes/' + classId + '/regenerate-code', { method: 'POST' });
+                showToast('新邀请码：' + data.invite_code, 'success');
+                const el = document.getElementById('classInviteCode');
+                if (el) el.textContent = data.invite_code;
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        // ========= UI 切换 =========
+        function showSection(name) {
+            document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+            const target = document.getElementById('section-' + name);
+            if (target) target.classList.add('active');
+            document.querySelectorAll('.cls-sidebar .nav-item').forEach(el => el.classList.remove('active'));
+            event.currentTarget?.classList.add('active');
+            const titles = { overview: '📊 班级总览', members: '👥 学生管理', announcements: '📢 班级公告', analytics: '📈 数据分析' };
+            document.getElementById('pageTitle').textContent = titles[name] || '';
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('show'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+        function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    </script>
+</body>
+</html>

@@ -285,4 +285,40 @@ router.get('/leaderboard/projects', (req, res) => {
     res.json({ projects });
 });
 
+// ===== 教师添加模板 =====
+router.post('/template/create', authMiddleware, (req, res) => {
+    const db = getDb();
+
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: '只有教师和管理员可以添加模板' });
+    }
+
+    const { name, description, category, difficulty, price, previewHtml, htmlContent, cssContent, jsContent, tags } = req.body;
+
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: '模板名称不能为空' });
+    }
+
+    const slug = name.trim().toLowerCase()
+        .replace(/[\u4e00-\u9fa5]/g, c => c.charCodeAt(0).toString(36))
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') + '-' + Date.now().toString(36);
+
+    try {
+        const result = db.prepare(`
+            INSERT INTO templates (name, slug, description, category, difficulty, price, preview_html, html_content, css_content, js_content, tags)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            name.trim(), slug,
+            description || '', category || 'website', difficulty || 'easy',
+            parseInt(price) || 0, previewHtml || '', htmlContent || '',
+            cssContent || '', jsContent || '', tags || ''
+        );
+        res.json({ success: true, template: { id: result.lastInsertRowid, slug } });
+    } catch (err) {
+        res.status(500).json({ error: '创建模板失败' });
+    }
+});
+
 module.exports = router;
