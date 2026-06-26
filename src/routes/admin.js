@@ -392,4 +392,80 @@ router.delete('/comments/:id', (req, res) => {
     res.json({ success: true, message: '评论已删除' });
 });
 
+// ===== 教师注册邀请码管理 =====
+
+function genInviteCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = '';
+    for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+}
+
+// 邀请码列表
+router.get('/invite-codes', (req, res) => {
+    const db = getDb();
+    const codes = db.prepare(`
+        SELECT c.*, u.username AS creator_name
+        FROM teacher_invite_codes c
+        LEFT JOIN users u ON c.created_by = u.id
+        ORDER BY c.created_at DESC
+    `).all();
+    res.json({ codes });
+});
+
+// 创建邀请码
+router.post('/invite-codes', (req, res) => {
+    const db = getDb();
+    let { code, note, max_uses, expires_at } = req.body;
+    code = (code || '').trim().toUpperCase();
+    if (!code) code = genInviteCode();
+    if (!/^[A-Z0-9_-]{4,32}$/.test(code)) {
+        return res.status(400).json({ error: '邀请码只能包含字母、数字、下划线和连字符，长度4-32位' });
+    }
+    const exists = db.prepare('SELECT id FROM teacher_invite_codes WHERE code = ?').get(code);
+    if (exists) return res.status(400).json({ error: '该邀请码已存在' });
+
+    const maxUses = Number.isInteger(+max_uses) && +max_uses > 0 ? +max_uses : 0;
+    const expiresAt = expires_at ? new Date(expires_at).toISOString() : null;
+
+    const result = db.prepare(`
+        INSERT INTO teacher_invite_codes (code, note, max_uses, expires_at, created_by)
+        VALUES (?, ?, ?, ?, ?)
+    `).run(code, note || '', maxUses, expiresAt, req.user.id);
+
+    const created = db.prepare('SELECT * FROM teacher_invite_codes WHERE id = ?').get(result.lastInsertRowid);
+    res.json({ success: true, code: created, message: '邀请码已创建' });
+});
+
+// 更新邀请码（备注/上限/有效期/启用状态）
+router.put('/invite-codes/:id', (req, res) => {
+    const db = getDb();
+    const codeRow = db.prepare('SELECT * FROM teacher_invite_codes WHERE id = ?').get(req.params.id);
+    if (!codeRow) return res.status(404).json({ error: '邀请码不存在' });
+
+    const { note, max_uses, expires_at, is_active } = req.body;
+    const newNote = note !== undefined ? note : codeRow.note;
+    const newMax = max_uses !== undefined ? (Number.isInteger(+max_uses) && +max_uses > 0 ? +max_uses : 0) : codeRow.max_uses;
+    const newExpires = expires_at !== undefined ? (expires_at ? new Date(expires_at).toISOString() : null) : codeRow.expires_at;
+    const newActive = is_active !== undefined ? (is_active ? 1 : 0) : codeRow.is_active;
+
+    db.prepare(`
+        UPDATE teacher_invite_codes
+        SET note = ?, max_uses = ?, expires_at = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    `).run(newNote, newMax, newExpires, newActive, codeRow.id);
+
+    const updated = db.prepare('SELECT * FROM teacher_invite_codes WHERE id = ?').get(codeRow.id);
+    res.json({ success: true, code: updated, message: '邀请码已更新' });
+});
+
+// 删除邀请码
+router.delete('/invite-codes/:id', (req, res) => {
+    const db = getDb();
+    const codeRow = db.prepare('SELECT * FROM teacher_invite_codes WHERE id = ?').get(req.params.id);
+    if (!codeRow) return res.status(404).json({ error: '邀请码不存在' });
+    db.prepare('DELETE FROM teacher_invite_codes WHERE id = ?').run(codeRow.id);
+    res.json({ success: true, message: `邀请码 ${codeRow.code} 已删除` });
+});
+
 module.exports = router;

@@ -114,6 +114,7 @@
             <div class="nav-group">
                 <div class="nav-label">管理</div>
                 <a class="nav-item" onclick="switchTab('users')"><span class="icon">👥</span> 用户管理</a>
+                <a class="nav-item" onclick="switchTab('inviteCodes')"><span class="icon">🎟️</span> 教师邀请码</a>
                 <a class="nav-item" onclick="switchTab('projects')"><span class="icon">📁</span> 项目管理</a>
                 <a class="nav-item" onclick="switchTab('templates')"><span class="icon">🎨</span> 模板管理</a>
             </div>
@@ -250,7 +251,66 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ===== 教师邀请码 ===== -->
+            <div id="tab-inviteCodes" class="section-tabs">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>🎟️ 教师注册邀请码</h2>
+                        <div class="panel-toolbar">
+                            <button class="btn btn-primary" onclick="showCreateInviteModal()">+ 新建邀请码</button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <p style="color:#94a3b8;font-size:.85rem;margin-bottom:12px;">教师注册必须填写有效邀请码。学生注册无需邀请码。</p>
+                        <table class="data-table">
+                            <thead>
+                                <tr><th>邀请码</th><th>备注</th><th>已用/上限</th><th>有效期</th><th>状态</th><th>创建人</th><th>操作</th></tr>
+                            </thead>
+                            <tbody id="inviteCodesTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </main>
+    </div>
+
+    <!-- 邀请码模态框 -->
+    <div class="modal-overlay" id="inviteModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="inviteModalTitle">新建邀请码</h3>
+                <button class="modal-close" onclick="closeModal('inviteModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editInviteId">
+                <div class="form-group">
+                    <label>邀请码（留空自动生成，仅字母数字/-/_，4-32位）</label>
+                    <input class="form-input" id="inviteCode" placeholder="留空自动生成" style="text-transform:uppercase">
+                </div>
+                <div class="form-group">
+                    <label>备注（用途说明）</label>
+                    <input class="form-input" id="inviteNote" placeholder="例：2026春季临港区教师">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>使用次数上限（0=不限）</label>
+                        <input class="form-input" id="inviteMaxUses" type="number" min="0" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>有效期至（留空=永久）</label>
+                        <input class="form-input" id="inviteExpires" type="date">
+                    </div>
+                </div>
+                <div class="form-group" id="inviteActiveGroup" style="display:none;">
+                    <label><input type="checkbox" id="inviteActive" checked> 启用</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="closeModal('inviteModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveInvite()">保存</button>
+            </div>
+        </div>
     </div>
 
     <!-- 用户编辑模态框 -->
@@ -297,6 +357,12 @@
                         <input class="form-input" id="editBio" placeholder="个人简介">
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>头像 URL</label>
+                        <input class="form-input" id="editAvatar" placeholder="https://... 或留空">
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-danger" onclick="closeModal('userModal')">取消</button>
@@ -334,7 +400,8 @@
                 users: '👥 用户管理',
                 projects: '📁 项目管理',
                 templates: '🎨 模板管理',
-                coins: '🪙 金币管理'
+                coins: '🪙 金币管理',
+                inviteCodes: '🎟️ 教师邀请码'
             };
             document.getElementById('pageTitle').textContent = titles[tab] || tab;
 
@@ -342,6 +409,7 @@
             if (tab === 'users') loadUsers();
             if (tab === 'projects') loadProjects();
             if (tab === 'templates') loadTemplates();
+            if (tab === 'inviteCodes') loadInviteCodes();
         }
 
         // ===== 仪表盘 =====
@@ -410,6 +478,7 @@
             document.getElementById('editRole').value = 'user';
             document.getElementById('editCoins').value = '0';
             document.getElementById('editBio').value = '';
+            document.getElementById('editAvatar').value = '';
             document.getElementById('userModalSave').textContent = '创建';
             openModal('userModal');
         }
@@ -427,6 +496,7 @@
                 document.getElementById('editRole').value = u.role || 'user';
                 document.getElementById('editCoins').value = u.coins;
                 document.getElementById('editBio').value = u.bio || '';
+                document.getElementById('editAvatar').value = u.avatar || '';
                 document.getElementById('userModalSave').textContent = '保存';
                 openModal('userModal');
             } catch (e) {
@@ -441,7 +511,8 @@
                 email: document.getElementById('editEmail').value,
                 role: document.getElementById('editRole').value,
                 coins: parseInt(document.getElementById('editCoins').value) || 0,
-                bio: document.getElementById('editBio').value
+                bio: document.getElementById('editBio').value,
+                avatar: document.getElementById('editAvatar').value
             };
             const password = document.getElementById('editPassword').value;
             if (password) body.password = password;
@@ -621,11 +692,116 @@
             } catch (e) { showToast(e.message, 'error'); }
         }
 
+        // ===== 教师邀请码 =====
+        async function loadInviteCodes() {
+            try {
+                const data = await api('/api/admin/invite-codes');
+                const tbody = document.getElementById('inviteCodesTable');
+                if (!data.codes.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#64748b;padding:24px;">暂无邀请码，点击右上角新建</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.codes.map(c => {
+                    const usage = c.max_uses > 0 ? `${c.used_count} / ${c.max_uses}` : `${c.used_count} / 不限`;
+                    const expired = c.expires_at && new Date(c.expires_at) < new Date();
+                    const expireText = c.expires_at ? new Date(c.expires_at).toLocaleDateString() : '永久';
+                    let status, color;
+                    if (!c.is_active) { status = '已停用'; color = '#64748b'; }
+                    else if (expired) { status = '已过期'; color = '#ef4444'; }
+                    else if (c.max_uses > 0 && c.used_count >= c.max_uses) { status = '已用尽'; color = '#f59e0b'; }
+                    else { status = '有效'; color = '#22c55e'; }
+                    return `<tr>
+                        <td><code style="color:#818cf8;font-weight:700;font-size:.95rem;letter-spacing:1px;">${esc(c.code)}</code></td>
+                        <td>${esc(c.note || '-')}</td>
+                        <td>${usage}</td>
+                        <td>${expireText}</td>
+                        <td><span class="badge" style="background:${color}22;color:${color};">${status}</span></td>
+                        <td>${esc(c.creator_name || '-')}</td>
+                        <td>
+                            <button class="btn btn-sm" onclick="copyInvite('${esc(c.code)}')">复制</button>
+                            <button class="btn btn-sm" onclick="showEditInviteModal(${c.id})">编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteInvite(${c.id}, '${esc(c.code)}')">删除</button>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        let inviteCodesCache = [];
+        async function refreshInviteCache() {
+            try { inviteCodesCache = (await api('/api/admin/invite-codes')).codes; } catch {}
+        }
+
+        function showCreateInviteModal() {
+            document.getElementById('inviteModalTitle').textContent = '新建邀请码';
+            document.getElementById('editInviteId').value = '';
+            document.getElementById('inviteCode').value = '';
+            document.getElementById('inviteCode').disabled = false;
+            document.getElementById('inviteNote').value = '';
+            document.getElementById('inviteMaxUses').value = '0';
+            document.getElementById('inviteExpires').value = '';
+            document.getElementById('inviteActiveGroup').style.display = 'none';
+            openModal('inviteModal');
+        }
+
+        async function showEditInviteModal(id) {
+            await refreshInviteCache();
+            const c = inviteCodesCache.find(x => x.id === id);
+            if (!c) return;
+            document.getElementById('inviteModalTitle').textContent = '编辑邀请码';
+            document.getElementById('editInviteId').value = c.id;
+            document.getElementById('inviteCode').value = c.code;
+            document.getElementById('inviteCode').disabled = true;
+            document.getElementById('inviteNote').value = c.note || '';
+            document.getElementById('inviteMaxUses').value = c.max_uses || 0;
+            document.getElementById('inviteExpires').value = c.expires_at ? c.expires_at.slice(0, 10) : '';
+            document.getElementById('inviteActiveGroup').style.display = 'block';
+            document.getElementById('inviteActive').checked = !!c.is_active;
+            openModal('inviteModal');
+        }
+
+        async function saveInvite() {
+            const id = document.getElementById('editInviteId').value;
+            const body = {
+                code: document.getElementById('inviteCode').value.trim(),
+                note: document.getElementById('inviteNote').value.trim(),
+                max_uses: parseInt(document.getElementById('inviteMaxUses').value) || 0,
+                expires_at: document.getElementById('inviteExpires').value || null
+            };
+            try {
+                if (id) {
+                    body.is_active = document.getElementById('inviteActive').checked;
+                    await api('/api/admin/invite-codes/' + id, { method: 'PUT', body });
+                    showToast('邀请码已更新', 'success');
+                } else {
+                    const data = await api('/api/admin/invite-codes', { method: 'POST', body });
+                    showToast('邀请码已创建：' + data.code.code, 'success');
+                }
+                closeModal('inviteModal');
+                loadInviteCodes();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function deleteInvite(id, code) {
+            if (!confirm(`确定删除邀请码「${code}」？`)) return;
+            try {
+                await api('/api/admin/invite-codes/' + id, { method: 'DELETE' });
+                showToast('已删除', 'success');
+                loadInviteCodes();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        function copyInvite(code) {
+            navigator.clipboard?.writeText(code).then(
+                () => showToast('已复制：' + code, 'success'),
+                () => showToast('复制失败', 'error')
+            );
+        }
+
         // ===== 工具 =====
         function openModal(id) { document.getElementById(id).classList.add('show'); }
         function closeModal(id) { document.getElementById(id).classList.remove('show'); }
         function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
         let debounceTimers = {};
         function debounce(fn, delay) {
             return function() {

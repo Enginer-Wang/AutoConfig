@@ -212,6 +212,27 @@ router.post('/quiz/:id/answer', (req, res) => {
          VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(quizId, question.id, user.id, answer, isCorrect ? 1 : 0, score, timeSpent || 0);
 
+    // 答错则自动归集到错题本
+    if (!isCorrect) {
+        const cls = db.prepare('SELECT subject FROM classes WHERE id = ?').get(quiz.class_id);
+        const subject = cls ? (cls.subject || '') : '';
+        const existingMistake = db.prepare(
+            'SELECT id FROM mistake_notebook WHERE student_id = ? AND question_id = ?'
+        ).get(user.id, question.id);
+        if (existingMistake) {
+            db.prepare(
+                `UPDATE mistake_notebook
+                 SET wrong_count = wrong_count + 1, wrong_answer = ?, mastery_status = 'unmastered'
+                 WHERE id = ?`
+            ).run(answer, existingMistake.id);
+        } else {
+            db.prepare(
+                `INSERT INTO mistake_notebook (student_id, question_id, quiz_id, class_id, subject, wrong_answer)
+                 VALUES (?, ?, ?, ?, ?, ?)`
+            ).run(user.id, question.id, quizId, quiz.class_id, subject, answer);
+        }
+    }
+
     // 检查是否全部答完，如果是则自动写入成绩册
     const totalQuestions = db.prepare('SELECT COUNT(*) as c FROM quiz_questions WHERE quiz_id = ?').get(quizId).c;
     const answeredCount = db.prepare('SELECT COUNT(*) as c FROM quiz_responses WHERE quiz_id = ? AND student_id = ?').get(quizId, user.id).c;

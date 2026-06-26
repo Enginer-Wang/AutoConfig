@@ -6,6 +6,11 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'autoconfig-secret-key-2026';
 const JWT_EXPIRES = '7d';
 
+// 生产环境安全提示：未配置自定义密钥时使用内置默认值存在风险
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+    console.warn('  ⚠️  [安全警告] 未设置 JWT_SECRET 环境变量，正在使用内置默认密钥。生产环境请务必配置 JWT_SECRET！');
+}
+
 function generateToken(user) {
     return jwt.sign(
         { id: user.id, username: user.username, email: user.email },

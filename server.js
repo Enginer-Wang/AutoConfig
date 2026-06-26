@@ -24,6 +24,9 @@ const autogradeRoutes = require('./src/routes/autograde');
 const gamificationRoutes = require('./src/routes/gamification');
 const classAnalyticsRoutes = require('./src/routes/classAnalytics');
 const instantAssignmentRoutes = require('./src/routes/instantAssignment');
+const mistakesRoutes = require('./src/routes/mistakes');
+const liveRoutes = require('./src/routes/live');
+const classroomChatRoutes = require('./src/routes/classroomChat');
 const { authMiddleware, adminMiddleware } = require('./src/middleware/auth');
 
 const app = express();
@@ -60,6 +63,9 @@ app.use('/api/autograde', autogradeRoutes);
 app.use('/api/gamification', gamificationRoutes);
 app.use('/api/class-analytics', classAnalyticsRoutes);
 app.use('/api/instant', instantAssignmentRoutes);
+app.use('/api/mistakes', mistakesRoutes);
+app.use('/api/live', liveRoutes);
+app.use('/api/classroom-chat', classroomChatRoutes);
 
 // 已部署站点的路由 - /site/username/project 路径访问
 app.use('/site', siteRoutes);
@@ -151,6 +157,18 @@ app.get('/class-analytics', (req, res) => {
 
 app.get('/instant-quiz', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/instant-quiz.html'));
+});
+
+app.get('/mistakes', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/mistakes.html'));
+});
+
+app.get('/live-console', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/live-console.html'));
+});
+
+app.get('/live-classroom', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/live-classroom.html'));
 });
 
 app.get('/edit-project/:id', (req, res) => {

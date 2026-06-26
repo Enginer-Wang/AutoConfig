@@ -880,6 +880,129 @@ router.get('/user-by-name/:username', (req, res) => {
     res.json({ user });
 });
 
+// ==================== 好友系统 ====================
+
+// 计算两个用户的好友关系状态
+function friendStatus(db, meId, otherId) {
+    if (meId === otherId) return 'self';
+    const row = db.prepare(
+        `SELECT * FROM friendships WHERE (requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)`
+    ).get(meId, otherId, otherId, meId);
+    if (!row) return 'none';
+    if (row.status === 'accepted') return 'friends';
+    if (row.status === 'pending') return row.requester_id === meId ? 'requested' : 'incoming';
+    return 'none';
+}
+
+// 搜索用户（按用户名/邮箱模糊，返回好友状态）
+router.get('/users/search', (req, res) => {
+    const db = getDb();
+    const q = (req.query.q || '').trim();
+    if (!q) return res.json({ users: [] });
+    const meId = req.user.id;
+    const rows = db.prepare(
+        `SELECT id, username, avatar, bio, role FROM users
+         WHERE (username LIKE ? OR email LIKE ?) AND id != ? LIMIT 20`
+    ).all(`%${q}%`, `%${q}%`, meId);
+    const users = rows.map(u => ({ ...u, status: friendStatus(db, meId, u.id) }));
+    res.json({ users });
+});
+
+// 发送好友请求
+router.post('/friends/request', (req, res) => {
+    const db = getDb();
+    const meId = req.user.id;
+    const targetId = parseInt(req.body.userId);
+    if (!targetId || targetId === meId) return res.status(400).json({ error: '无效的用户' });
+    const target = db.prepare('SELECT id, username FROM users WHERE id = ?').get(targetId);
+    if (!target) return res.status(404).json({ error: '用户不存在' });
+
+    const status = friendStatus(db, meId, targetId);
+    if (status === 'friends') return res.status(400).json({ error: '你们已经是好友' });
+    if (status === 'requested') return res.status(400).json({ error: '已发送过请求，等待对方确认' });
+    if (status === 'incoming') {
+        // 对方已请求过我 → 直接互相成为好友
+        db.prepare("UPDATE friendships SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE requester_id = ? AND addressee_id = ?")
+            .run(targetId, meId);
+        notifyFriend(targetId, { type: 'friend_accepted', user: { id: meId, username: req.user.username } });
+        return res.json({ success: true, status: 'friends', message: '已添加为好友' });
+    }
+    db.prepare('INSERT INTO friendships (requester_id, addressee_id, status, remark) VALUES (?, ?, ?, ?)')
+        .run(meId, targetId, 'pending', (req.body.remark || '').slice(0, 100));
+    notifyFriend(targetId, { type: 'friend_request', user: { id: meId, username: req.user.username } });
+    res.json({ success: true, status: 'requested', message: '好友请求已发送' });
+});
+
+// 收到的好友请求列表
+router.get('/friends/requests', (req, res) => {
+    const db = getDb();
+    const meId = req.user.id;
+    const incoming = db.prepare(
+        `SELECT f.id, f.remark, f.created_at, u.id AS user_id, u.username, u.avatar, u.bio
+         FROM friendships f JOIN users u ON u.id = f.requester_id
+         WHERE f.addressee_id = ? AND f.status = 'pending' ORDER BY f.created_at DESC`
+    ).all(meId);
+    const outgoing = db.prepare(
+        `SELECT f.id, f.created_at, u.id AS user_id, u.username, u.avatar
+         FROM friendships f JOIN users u ON u.id = f.addressee_id
+         WHERE f.requester_id = ? AND f.status = 'pending' ORDER BY f.created_at DESC`
+    ).all(meId);
+    res.json({ incoming, outgoing });
+});
+
+// 接受/拒绝好友请求
+router.post('/friends/respond', (req, res) => {
+    const db = getDb();
+    const meId = req.user.id;
+    const requestId = parseInt(req.body.requestId);
+    const accept = !!req.body.accept;
+    const fr = db.prepare('SELECT * FROM friendships WHERE id = ? AND addressee_id = ? AND status = ?')
+        .get(requestId, meId, 'pending');
+    if (!fr) return res.status(404).json({ error: '请求不存在或已处理' });
+
+    if (accept) {
+        db.prepare("UPDATE friendships SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(requestId);
+        notifyFriend(fr.requester_id, { type: 'friend_accepted', user: { id: meId, username: req.user.username } });
+        res.json({ success: true, status: 'friends' });
+    } else {
+        db.prepare('DELETE FROM friendships WHERE id = ?').run(requestId);
+        res.json({ success: true, status: 'rejected' });
+    }
+});
+
+// 好友列表（含在线/资料）
+router.get('/friends', (req, res) => {
+    const db = getDb();
+    const meId = req.user.id;
+    const friends = db.prepare(
+        `SELECT u.id, u.username, u.avatar, u.bio, u.role, f.created_at AS since
+         FROM friendships f
+         JOIN users u ON u.id = CASE WHEN f.requester_id = ? THEN f.addressee_id ELSE f.requester_id END
+         WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = 'accepted'
+         ORDER BY u.username`
+    ).all(meId, meId, meId);
+    res.json({ friends });
+});
+
+// 删除好友
+router.delete('/friends/:userId', (req, res) => {
+    const db = getDb();
+    const meId = req.user.id;
+    const otherId = parseInt(req.params.userId);
+    db.prepare(
+        `DELETE FROM friendships WHERE ((requester_id = ? AND addressee_id = ?) OR (requester_id = ? AND addressee_id = ?)) AND status = 'accepted'`
+    ).run(meId, otherId, otherId, meId);
+    res.json({ success: true });
+});
+
+// 好友请求实时通知
+function notifyFriend(userId, payload) {
+    try {
+        const { sendToUser } = require('../websocket');
+        if (sendToUser) sendToUser(userId, payload);
+    } catch (e) { /* ws 不可用时忽略 */ }
+}
+
 // ==================== 辅助函数 ====================
 function getQuarter() {
     const now = new Date();

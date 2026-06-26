@@ -6,7 +6,7 @@
 
 ## 📖 项目简介
 
-**Autoconfig** 是一个面向教育场景的全功能互动平台，集静态网页托管、班级与学生管理、作业发布批改、即时测验、协作编程、代码回放、自动化测试、学情分析、课件展示、模板商城、社区广场、教学 IM 系统和管理后台于一体。适合教师创建互动课件并管理班级教学，也适合学生展示个人项目和参与学习互动。
+**Autoconfig** 是一个面向教育场景的全功能互动平台，集静态网页托管、班级与学生管理、作业发布批改、即时测验、协作编程、代码回放、自动化测试、学情分析、在线直播课堂与数字巡课墙、课堂互动聊天室、课件展示、模板商城、社区广场、教学 IM 系统（含好友系统）和管理后台于一体。适合教师创建互动课件并管理班级教学，也适合学生展示个人项目和参与学习互动。
 
 ## 📖 项目在线预览
 
@@ -25,15 +25,18 @@ https://www.autoconfig.uno/
 | 🤖 **自动化测试** | DOM 结构检查、自动判分、HTML/CSS/JS 语法检测、lint 报告 |
 | 👀 **互评系统** | 匿名互评分配、评分检查清单、综合加权成绩 |
 | 🔄 **协作编程** | Yjs CRDT 实时协同，师生结对编程，教师远程进入学生编辑器，会话码加入 |
+| 🎥 **直播课堂** | WebRTC 屏幕共享直播、数字巡课墙（实时网格监控）、专注度监测、一键呼叫老师、远程接管、结课质量报告 |
+| 💬 **课堂聊天室** | 绑定班级的永久聊天室、Markdown/代码/图片/语音、表态回复、弹幕模式、全员/单人禁言、DING 强提醒、签到/投票活动柱状图、课堂活跃度分析 |
 | ⏪ **代码回放** | 按键轨迹记录，编码过程回放，"直接粘贴"检测，代码活跃度统计 |
 | 📊 **学情分析** | 代码活跃度热力图（GitHub 绿墙风格）、学业危机预警、学生能力五维雷达画像、动态分组引擎 |
 | 📈 **教师数据大屏** | 作业完成度漏斗、成绩正态分布直方图、学生画像预警、知识点掌握度 |
 | 🪙 **积分银行** | 金币任务系统（每日签到、连续提交等 8 种任务）、积分商店（迟交券/重做卡/装饰等 6 种道具）、道具使用效果 |
 | 🏪 **模板商城** | 12+ 精选网站/游戏模板，金币系统解锁，获取源码自由修改 |
 | 🌐 **社区广场** | 公开项目展示、点赞、评论，作品互相交流 |
-| 💬 **教学 IM 系统** | 私信/班级群/小组群/答疑工单、悬赏提问、抢答/签到活动、消息打赏、答疑排行榜、WebSocket 实时推送 |
+| 💬 **教学 IM 系统** | 私信/班级群/小组群/答疑工单、好友查询添加、悬赏提问、抢答/签到活动、消息打赏、答疑排行榜、WebSocket 实时推送 |
 | 🏆 **排行榜** | 项目访问量、点赞数、金币排行 |
-| 👑 **管理后台** | 用户/项目/模板/评论/角色全面 CRUD 管理 |
+| 👑 **管理后台** | 用户/项目/模板/评论/角色全面 CRUD 管理、教师注册邀请码管理 |
+| 🎟️ **教师邀请码** | 教师注册需管理员提供的邀请码验证，支持次数上限/有效期/启用停用 |
 | 📱 **响应式设计** | 全平台适配，移动端友好 |
 
 ### 📸 页面一览
@@ -47,13 +50,15 @@ https://www.autoconfig.uno/
 - `/homework` — 作业中心（发布/提交/批改/编辑/删除/催交/查重）
 - `/grading-workspace` — 批改工作台（多维度评分、代码逐行批注、查重报告）
 - `/instant-quiz` — 即时测验（限时选择题、代码填空、实时判分）
+- `/live-console` — 教师数字巡课墙（实时网格监控、屏幕共享、远程接管、结课报告）
+- `/live-classroom` — 学生直播课堂（观看直播、编辑器、专注度监控、呼叫老师）
 - `/editor/:id` — 模板源码编辑器
 - `/edit-project/:id` — 已部署项目源码编辑器
 - `/templates` — 模板商城
 - `/community` — 社区广场
 - `/leaderboard` — 排行榜
 - `/subjects` — 学科课件浏览
-- `/chat` `/chat/:username` — 教学 IM 系统
+- `/chat` `/chat/:username` — 教学 IM 系统（含好友查询添加、直播课堂跳转）
 - `/project/:username/:slug` — 项目展示页
 - `/site/:username/:slug` — 部署站点访问
 - `/admin` — 管理后台（用户/项目/模板/评论管理）
@@ -161,13 +166,29 @@ user_mission_progress    — 用户任务进度
 chat_rooms               — 聊天房间（私信/班级群/小组群/答疑 Ticket）
 chat_room_members        — 房间成员
 chat_messages            — 群组消息（支持代码片段/Markdown/系统消息）
+chat_message_reactions   — 消息表态（+1/赞/懂了）
 chat_tickets             — 答疑工单
 chat_bounties            — 金币悬赏提问
-chat_activities          — 课堂抢答/签到活动
+chat_activities          — 课堂抢答/签到/投票活动
 chat_activity_responses  — 活动参与记录
 chat_tips                — 消息打赏
 chat_helper_stats        — 答疑排行榜统计
+friendships              — 好友关系（申请/接受/双向查询）
 messages                 — 私信消息（向下兼容）
+```
+
+**直播课堂与巡课**
+```
+live_sessions            — 直播课堂会话（开课/下课）
+live_participants        — 课堂参与者
+live_student_status      — 学生实时状态（专注度/编码活跃度）
+live_help_requests       — 一键呼叫老师求助
+live_interventions       — 教师介入/接管记录
+```
+
+**系统管理**
+```
+teacher_invite_codes     — 教师注册邀请码（管理员编辑提供，次数/有效期/启用控制）
 ```
 
 ### 项目目录结构
@@ -188,7 +209,9 @@ Autoconfig/
 │       ├── sites.js          # 已部署站点静态文件服务
 │       ├── community.js      # 社区广场、点赞、评论
 │       ├── store.js          # 模板商城、购买、金币兑换、排行榜
-│       ├── chat.js           # 教学 IM（房间/群组/答疑工单/悬赏/抢答/签到/打赏）
+│       ├── chat.js           # 教学 IM（房间/群组/答疑工单/悬赏/抢答/签到/打赏/好友）
+│       ├── classroomChat.js  # 课堂聊天室（绑定班级永久聊天室、弹幕、表态、签到投票）
+│       ├── live.js           # 直播课堂与数字巡课墙（开课/巡课/接管/结课报告）
 │       ├── classes.js        # 班级管理、成员、公告、考勤、分组、数据分析
 │       ├── homework.js       # 作业发布、提交、批改、催交、文件上传
 │       ├── exercises.js      # 练习记录、排名
@@ -211,7 +234,9 @@ Autoconfig/
 │   ├── templates.html        # 模板商城
 │   ├── community.html        # 社区广场
 │   ├── leaderboard.html      # 排行榜
-│   ├── chat.html             # 教学 IM 系统
+│   ├── chat.html             # 教学 IM 系统（含好友系统、直播跳转）
+│   ├── live-console.html     # 教师数字巡课墙
+│   ├── live-classroom.html   # 学生直播课堂
 │   ├── project.html          # 项目展示页
 │   ├── classes.html          # 班级管理（侧边栏 + 多标签页）
 │   ├── class-analytics.html  # 学情看板（热力图/预警/雷达图）
@@ -228,6 +253,7 @@ Autoconfig/
 │   ├── css/                  # 全局样式文件
 │   ├── js/
 │   │   ├── common.js         # 统一导航栏、SPA 过渡、API 封装、工具函数
+│   │   ├── classroom-chat.js # 课堂聊天面板共享模块（师生复用）
 │   │   └── main.js           # 首页动画脚本
 │   └── assets/               # 静态资源
 └── data/                     # 运行时数据（自动生成）
@@ -283,6 +309,8 @@ npm start
 | 👨‍🏫 教师（示例） | `teacher_wuli` | `teacher123` | 可创建班级、发布作业 |
 
 > 系统支持 4 种角色：`admin`（管理员）、`teacher`（教师）、`student`（学生）、`user`（普通用户）
+>
+> ⚠️ **教师注册需邀请码**：教师身份注册必须填写由管理员在后台「🎟️ 教师邀请码」页生成的有效邀请码；学生注册无需邀请码。
 
 ### 生产部署
 
@@ -353,7 +381,7 @@ server {
 ### 认证 `/api/auth`
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/register` | 注册 |
+| POST | `/register` | 注册（教师需提供有效邀请码） |
 | POST | `/login` | 登录 |
 | POST | `/logout` | 退出 |
 | GET | `/me` | 获取当前用户信息 |
@@ -402,6 +430,35 @@ server {
 | POST | `/bounties` | 发布悬赏提问 |
 | POST | `/activities` | 发起抢答/签到活动 |
 | POST | `/tips` | 消息打赏 |
+| GET | `/users/search` | 搜索用户（附带好友状态） |
+| POST | `/friends/request` | 发起好友申请 |
+| GET | `/friends/requests` | 好友请求收/发件箱 |
+| POST | `/friends/respond` | 接受/拒绝好友请求 |
+| GET | `/friends` | 好友列表 |
+| DELETE | `/friends/:userId` | 删除好友 |
+
+### 课堂聊天室 `/api/classroom-chat`（需登录）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/room/:id/messages` | 聊天室消息记录 |
+| POST | `/room/:id/message` | 发送消息（文本/代码/图片/语音） |
+| POST | `/message/:id/reaction` | 表态回复（+1/赞/懂了） |
+| POST | `/room/:id/activity` | 发起签到/投票 |
+| POST | `/activity/:id/respond` | 签到/投票（支持改票） |
+| POST | `/activity/:id/end` | 结束活动 |
+| GET | `/room/:id/analytics` | 课堂活跃度分析 |
+
+### 直播课堂 `/api/live`（需登录）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/start` | 开课（教师） |
+| POST | `/end` | 下课并生成质量报告 |
+| POST | `/join` | 进入课堂（学生） |
+| POST | `/heartbeat` | 专注度/状态心跳 |
+| POST | `/help` | 一键呼叫老师 |
+| GET | `/wall/:sessionId` | 数字巡课墙（动态排序） |
+| POST | `/takeover` | 教师远程接管学生 |
+| GET | `/active` | 查询进行中的直播 |
 
 ### 班级 `/api/classes`（需登录）
 | 方法 | 路径 | 说明 |
@@ -511,6 +568,7 @@ server {
 | GET/PUT/DELETE | `/users` | 用户管理（支持角色筛选） |
 | GET/DELETE | `/projects` | 项目管理 |
 | GET/POST/PUT/DELETE | `/templates` | 模板管理 |
+| GET/POST/PUT/DELETE | `/invite-codes` | 教师注册邀请码管理 |
 
 ### WebSocket `/ws`
 | 事件 | 说明 |
@@ -523,10 +581,26 @@ server {
 | `activity_response` | 活动参与结果推送 |
 | `tip_animation` | 打赏动效广播 |
 | `collab_sync` | 协作编程实时同步 |
+| `live_status` | 巡课墙学生状态实时增量 |
+| `webrtc_signal` | 直播 WebRTC 信令中继 |
+| `chat_activity_update` | 课堂签到/投票柱状图实时更新 |
+| `friend_request` / `friend_accepted` | 好友请求/通过实时提醒 |
 
 ---
 
 ## 🔄 更新日志
+
+### v3.1.0 (2026-06-04)
+
+**直播课堂、聊天室与社交增强**
+- ✅ 在线直播课堂 + 数字巡课墙（WebRTC 屏幕共享、实时网格监控、专注度检测、一键呼叫老师、远程接管、结课质量报告）
+- ✅ 课堂互动聊天室（绑定班级永久聊天室、Markdown/代码/图片/语音、表态回复、引用回复、撤回、置顶、公告、弹幕模式、全员/单人禁言、DING 强提醒、敏感词过滤、发言限流）
+- ✅ 签到/投票活动卡片（实时柱状图、支持改票、课堂活跃度分析）
+- ✅ 好友系统（用户搜索、发起/接受/拒绝请求、好友列表、一键私聊、WebSocket 实时提醒）
+- ✅ 聊天页与直播课堂双向跳转联动（班级群一键进入直播）
+- ✅ 教师注册邀请码验证（管理后台编辑提供、次数上限/有效期/启用停用）
+- ✅ 错题本（错题归集、掌握度状态机、智能重练、班级高频错题讲评）
+- ✅ 管理后台用户编辑增强（可修改密码/姓名/角色/金币/头像等全部字段）
 
 ### v3.0.0 (2026-05-15)
 

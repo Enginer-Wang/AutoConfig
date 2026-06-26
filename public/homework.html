@@ -245,6 +245,18 @@
                 </div>
             </div>
             <div class="form-group">
+                <label>批改方式</label>
+                <select class="form-input" id="hwGradeMode" onchange="toggleAutoConfig()">
+                    <option value="manual">✍️ 人工批改（教师逐份打分）</option>
+                    <option value="auto_keyword">⚡ 自动判分（关键词 / 必需元素检查）</option>
+                </select>
+            </div>
+            <div class="form-group" id="autoConfigGroup" style="display:none">
+                <label>自动判分规则（每行一条，可选 <code>|分值</code>，缺省时平均分配满分）</label>
+                <textarea class="form-input" id="hwAutoRules" placeholder="示例：&#10;包含函数 def main|20&#10;&lt;table&#10;光合作用&#10;return 0" style="min-height:110px;font-family:monospace"></textarea>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:6px">系统会在学生提交时，检查其文字作答或上传的文本/源码中是否包含每条规则的关键词（不区分大小写）。命中即得对应分值，自动给出成绩。教师仍可在批改工作台手动调整。</div>
+            </div>
+            <div class="form-group">
                 <label>附件（可选）</label>
                 <div class="upload-zone" id="hwAttachZone">
                     <div class="upload-icon">📎</div>
@@ -631,6 +643,10 @@
         </div>`;
     }
 
+    function parseGradeMode(hw) {
+        try { return (JSON.parse(hw.test_config || '{}').mode) || 'manual'; } catch { return 'manual'; }
+    }
+
     function getStudentStatus(hw) {
         if (hw.my_status === 'graded') return { text:'已批改', cls:'status-graded', icon:'✅' };
         if (hw.my_status === 'submitted') return { text:'已提交', cls:'status-submitted', icon:'📤' };
@@ -695,6 +711,7 @@
                 <div class="sub-section-header">
                     <h3>📋 提交情况 (${data.submissions.length}/${data.totalStudents || 0})</h3>
                     <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-primary" onclick="location.href='/grading-workspace?id=${hw.id}'">🖥 批改工作台</button>
                         <button class="btn btn-sm btn-warning" onclick="openRemindModal(${hw.id})">📢 催交 (${unsubmitted}人未交)</button>
                         <button class="btn btn-sm btn-ghost" onclick="checkPlagiarism(${hw.id})">🔍 查重</button>
                     </div>
@@ -772,6 +789,7 @@
                             ${hw.due_date ? `<span>⏰ ${formatDueDate(hw.due_date)}${dueStatusHtml}</span>` : '<span>无截止日期</span>'}
                             <span>🏆 满分 ${hw.max_score}</span>
                             <span>${hw.type === 'group' ? '👥 小组作业' : '📄 个人作业'}</span>
+                            ${parseGradeMode(hw) === 'auto_keyword' ? '<span style="color:#34d399">⚡ 自动判分</span>' : ''}
                         </div>
                     </div>
                     ${isT ? `<div style="display:flex;gap:8px;flex-shrink:0">
@@ -873,9 +891,17 @@
         document.getElementById('hwDesc').value = '';
         document.getElementById('hwDue').value = '';
         document.getElementById('hwMaxScore').value = '100';
+        document.getElementById('hwGradeMode').value = 'manual';
+        document.getElementById('hwAutoRules').value = '';
+        toggleAutoConfig();
         hwAttachFiles = [];
         document.getElementById('hwAttachList').innerHTML = '';
         openModal('createModal');
+    }
+
+    function toggleAutoConfig() {
+        const mode = document.getElementById('hwGradeMode').value;
+        document.getElementById('autoConfigGroup').style.display = mode === 'auto_keyword' ? '' : 'none';
     }
 
     async function createHomework() {
@@ -886,16 +912,19 @@
         const maxScore = document.getElementById('hwMaxScore').value;
         const type = document.getElementById('hwType').value;
         const allowResubmit = document.getElementById('hwAllowResubmit').checked;
+        const gradeMode = document.getElementById('hwGradeMode').value;
+        const autoRules = document.getElementById('hwAutoRules').value.trim();
 
         if (!title) { showToast('请输入作业标题', 'error'); return; }
         if (!classId) { showToast('请选择班级', 'error'); return; }
+        if (gradeMode === 'auto_keyword' && !autoRules) { showToast('自动判分请至少填写一条规则', 'error'); return; }
 
         try {
             let attachments = [];
             if (hwAttachFiles.length) attachments = await uploadFiles(hwAttachFiles);
             await api('/api/homework/create', {
                 method: 'POST',
-                body: { title, description, classId, dueDate: dueDate || null, maxScore: parseInt(maxScore) || 100, type, allowResubmit, attachments }
+                body: { title, description, classId, dueDate: dueDate || null, maxScore: parseInt(maxScore) || 100, type, allowResubmit, attachments, gradeMode, autoRules }
             });
             showToast('作业发布成功！', 'success');
             closeModal('createModal');
@@ -959,7 +988,8 @@
             const attachEl = document.getElementById('gradeAttachments');
             try {
                 const files = JSON.parse(sub.attachment_url || '[]');
-                if (files.length) attachEl.innerHTML = files.map(f => `<a class="attach-item" href="${esc(f.url)}" target="_blank" style="display:inline-flex;margin:2px">📎 ${esc(f.name)}</a>`).join('');
+                if (files.length) attachEl.innerHTML = files.map(f => `<a class="attach-item" href="${esc(f.url)}" target="_blank" style="display:inline-flex;margin:2px">📎 ${esc(f.name)}</a>`).join('')
+                    + `<div style="margin-top:8px"><a class="btn btn-sm btn-primary" href="/grading-workspace?id=${currentHomeworkId}" style="text-decoration:none">🖥 在批改工作台查看程序源码</a></div>`;
                 else attachEl.innerHTML = '';
             } catch { attachEl.innerHTML = ''; }
 

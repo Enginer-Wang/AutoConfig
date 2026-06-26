@@ -306,11 +306,20 @@
             const filesData = await apiCall(`${API_BASE}/submission/${submission.id}/files`);
             currentFiles = filesData.files || [];
 
-            // 如果有站点 URL，在 iframe 中预览
+            const textContent = filesData.textContent || submission.content || '';
+            const htmlFile = currentFiles.find(f => f.ext === 'html' || f.ext === 'htm');
+
+            // 预览优先级：站点部署 > 上传的HTML文件 > 文字作答
             if (filesData.siteUrl) {
                 document.getElementById('previewFrame').src = filesData.siteUrl;
-            } else if (submission.content) {
-                const blob = new Blob([submission.content], { type: 'text/html' });
+            } else if (htmlFile && htmlFile.url) {
+                document.getElementById('previewFrame').src = htmlFile.url;
+            } else if (textContent) {
+                const safe = textContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const blob = new Blob([`<pre style="white-space:pre-wrap;word-break:break-word;font-family:-apple-system,sans-serif;padding:20px;color:#222">${safe}</pre>`], { type: 'text/html' });
+                document.getElementById('previewFrame').src = URL.createObjectURL(blob);
+            } else {
+                const blob = new Blob([`<div style="padding:40px;color:#888;font-family:sans-serif">该学生仅上传了文件，请切换到"源码查看"标签查看程序内容。</div>`], { type: 'text/html' });
                 document.getElementById('previewFrame').src = URL.createObjectURL(blob);
             }
 

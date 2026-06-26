@@ -7,13 +7,13 @@
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/app.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
-    <!-- Markdown 渲染 & 代码高亮 -->
+    <!-- Markdown 渲染 & 代码高亮（defer 避免 CDN 缓慢阻塞页面加载） -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github-dark.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/highlight.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/highlight.js@11/highlight.min.js"></script>
     <!-- KaTeX 数学公式 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"></script>
     <style>
         .chat-page{min-height:100vh;background:var(--bg-dark);display:flex;flex-direction:column}
         .chat-header{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--bg-card);border-bottom:1px solid var(--border)}
@@ -47,6 +47,26 @@
         .room-time{font-size:.68rem;color:var(--text-muted);display:block}
         .room-unread{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font-size:.63rem;font-weight:700;line-height:18px;text-align:center;margin-top:4px}
         .no-rooms{padding:40px 20px;text-align:center;color:var(--text-muted);font-size:.88rem}
+
+        /* 好友面板 */
+        .friend-search{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;gap:6px}
+        .friend-search input{flex:1;padding:8px 12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:.82rem;outline:none}
+        .friend-search input:focus{border-color:var(--primary)}
+        .friend-search button{padding:8px 12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:.8rem;cursor:pointer;font-family:inherit}
+        .friend-section-title{padding:10px 16px 4px;font-size:.72rem;color:var(--text-muted);font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+        .friend-item{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.03)}
+        .friend-item:hover{background:rgba(255,255,255,.03)}
+        .friend-ava{width:38px;height:38px;border-radius:50%;background:var(--gradient-2);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:.85rem;flex-shrink:0}
+        .friend-meta{flex:1;min-width:0}
+        .friend-name{font-size:.85rem;font-weight:600;color:var(--text-primary)}
+        .friend-bio{font-size:.72rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .friend-act{display:flex;gap:5px;flex-shrink:0}
+        .friend-act button{padding:5px 10px;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-primary);font-family:inherit;transition:all .15s}
+        .friend-act button.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+        .friend-act button.ok{background:#10b981;border-color:#10b981;color:#fff}
+        .friend-act button.ghost{color:var(--text-muted)}
+        .friend-act button:disabled{opacity:.5;cursor:default}
+        .friend-badge{display:inline-block;font-size:.62rem;padding:1px 6px;border-radius:6px;background:rgba(59,130,246,.15);color:#3b82f6;margin-left:4px}
 
         /* 右侧消息区 */
         .chat-main{flex:1;display:flex;flex-direction:column;min-width:0}
@@ -147,6 +167,7 @@
         <header class="chat-header">
             <a href="/dashboard" class="logo"><span class="icon">⚡</span> Autoconfig</a>
             <h2>💬 聊天室</h2>
+            <a href="#" id="liveJumpLink" class="btn-back" style="border-color:rgba(29,155,240,.4);color:#1d9bf0">🎥 进入直播课堂</a>
             <a href="/dashboard" class="btn-back">← 返回控制台</a>
         </header>
         <div class="chat-container">
@@ -155,6 +176,7 @@
                 <div class="sidebar-tabs">
                     <div class="sidebar-tab active" data-tab="rooms" onclick="switchTab('rooms')">🏠 <span>群聊</span></div>
                     <div class="sidebar-tab" data-tab="dm" onclick="switchTab('dm')">💬 <span>私信</span></div>
+                    <div class="sidebar-tab" data-tab="friends" onclick="switchTab('friends')">👫 <span>好友</span></div>
                     <div class="sidebar-tab" data-tab="tickets" onclick="switchTab('tickets')">🎫 <span>答疑</span></div>
                 </div>
                 <div class="sidebar-content" id="sidebarContent">
@@ -283,6 +305,19 @@
             loadRooms();
             loadConversations();
 
+            // 直播课堂跳转：教师→巡课台，学生→课堂
+            const role = currentUser.role || (currentUser.user && currentUser.user.role);
+            const liveLink = document.getElementById('liveJumpLink');
+            if (liveLink) {
+                if (role === 'teacher' || role === 'admin') {
+                    liveLink.href = '/live-console';
+                    liveLink.textContent = '🎥 进入巡课台';
+                } else {
+                    liveLink.href = '/live-classroom';
+                    liveLink.textContent = '🎥 进入直播课堂';
+                }
+            }
+
             // URL参数处理
             const chatTarget = window.location.pathname.split('/').filter(Boolean)[1] || null;
             if (chatTarget) {
@@ -331,6 +366,14 @@
                 case 'typing':
                     // Could show typing indicator
                     break;
+                case 'friend_request':
+                    showToast(`📬 ${msg.user?.username || '有人'} 请求添加你为好友`, 'info');
+                    if (activeTab === 'friends') renderFriendLists();
+                    break;
+                case 'friend_accepted':
+                    showToast(`✅ ${msg.user?.username || '对方'} 已通过你的好友请求`, 'success');
+                    if (activeTab === 'friends') renderFriendLists();
+                    break;
             }
         }
 
@@ -340,6 +383,7 @@
             document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
             if (tab === 'rooms') loadRooms();
             else if (tab === 'dm') loadConversations();
+            else if (tab === 'friends') loadFriends();
             else if (tab === 'tickets') loadTickets();
         }
 
@@ -406,6 +450,11 @@
                     headerActions += `<button class="btn-mute" onclick="toggleMuteAll()">${r.is_muted ? '🔊 解除禁言' : '🔇 全员禁言'}</button>`;
                     headerActions += `<button onclick="openModal('activityModal')">⚡ 互动</button>`;
                 }
+            }
+            // 班级群：提供进入直播课堂的入口
+            if (r.type === 'class' && r.class_id) {
+                const livePath = isAdmin ? '/live-console' : '/live-classroom';
+                headerActions += `<button style="border-color:rgba(29,155,240,.4);color:#1d9bf0" onclick="location.href='${livePath}?classId=${r.class_id}'">🎥 进入直播</button>`;
             }
 
             const roomName = r.type === 'dm' ? (r.members?.find(m => m.id !== currentUser.id)?.username || '私信') : r.name;
@@ -694,6 +743,139 @@
                     </div>
                 `).join('');
             } catch { }
+        }
+
+        // ========== 好友系统 ==========
+        let friendSearchResults = [];
+        async function loadFriends() {
+            const el = document.getElementById('sidebarContent');
+            el.innerHTML = `
+                <div class="friend-search">
+                    <input id="friendSearchInput" placeholder="搜索用户名/邮箱加好友..." onkeydown="if(event.key==='Enter')searchUsers()">
+                    <button onclick="searchUsers()">搜索</button>
+                </div>
+                <div id="friendListArea"><div class="no-rooms">加载中...</div></div>`;
+            await renderFriendLists();
+        }
+
+        async function renderFriendLists() {
+            try {
+                const [fData, rData] = await Promise.all([
+                    api('/api/chat/friends'),
+                    api('/api/chat/friends/requests')
+                ]);
+                const area = document.getElementById('friendListArea');
+                if (!area) return;
+                let html = '';
+                if (rData.incoming?.length) {
+                    html += `<div class="friend-section-title">📬 好友请求 (${rData.incoming.length})</div>`;
+                    html += rData.incoming.map(r => `
+                        <div class="friend-item">
+                            <div class="friend-ava">${esc((r.username || '?')[0].toUpperCase())}</div>
+                            <div class="friend-meta">
+                                <div class="friend-name">${esc(r.username)}</div>
+                                <div class="friend-bio">${esc(r.remark || r.bio || '请求添加你为好友')}</div>
+                            </div>
+                            <div class="friend-act">
+                                <button class="ok" onclick="respondFriend(${r.id}, true)">接受</button>
+                                <button class="ghost" onclick="respondFriend(${r.id}, false)">拒绝</button>
+                            </div>
+                        </div>`).join('');
+                }
+                if (rData.outgoing?.length) {
+                    html += `<div class="friend-section-title">⏳ 等待验证 (${rData.outgoing.length})</div>`;
+                    html += rData.outgoing.map(r => `
+                        <div class="friend-item">
+                            <div class="friend-ava">${esc((r.username || '?')[0].toUpperCase())}</div>
+                            <div class="friend-meta">
+                                <div class="friend-name">${esc(r.username)}</div>
+                                <div class="friend-bio">已发送好友请求</div>
+                            </div>
+                            <div class="friend-act"><button disabled>待确认</button></div>
+                        </div>`).join('');
+                }
+                html += `<div class="friend-section-title">👫 我的好友 (${fData.friends?.length || 0})</div>`;
+                if (!fData.friends?.length) {
+                    html += '<div class="no-rooms" style="padding:20px">还没有好友<br><small>搜索用户名添加好友吧</small></div>';
+                } else {
+                    html += fData.friends.map(f => {
+                        const roleTag = f.role === 'teacher' ? '<span class="friend-badge">教师</span>' : f.role === 'admin' ? '<span class="friend-badge">管理员</span>' : '';
+                        return `
+                        <div class="friend-item">
+                            <div class="friend-ava">${esc((f.username || '?')[0].toUpperCase())}</div>
+                            <div class="friend-meta">
+                                <div class="friend-name">${esc(f.username)}${roleTag}</div>
+                                <div class="friend-bio">${esc(f.bio || '这个人很懒，什么都没留下')}</div>
+                            </div>
+                            <div class="friend-act">
+                                <button class="primary" onclick="startDM(${f.id}, '${esc(f.username)}')">私聊</button>
+                                <button class="ghost" onclick="removeFriend(${f.id}, '${esc(f.username)}')">删除</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+                area.innerHTML = html;
+            } catch (e) { /* ignore */ }
+        }
+
+        async function searchUsers() {
+            const q = document.getElementById('friendSearchInput').value.trim();
+            if (!q) { renderFriendLists(); return; }
+            try {
+                const data = await api('/api/chat/users/search?q=' + encodeURIComponent(q));
+                const area = document.getElementById('friendListArea');
+                friendSearchResults = data.users || [];
+                if (!friendSearchResults.length) {
+                    area.innerHTML = '<div class="no-rooms" style="padding:20px">未找到匹配的用户</div>';
+                    return;
+                }
+                area.innerHTML = `<div class="friend-section-title">🔍 搜索结果</div>` + friendSearchResults.map(u => {
+                    let btn;
+                    if (u.status === 'friends') btn = `<button class="primary" onclick="startDM(${u.id}, '${esc(u.username)}')">私聊</button>`;
+                    else if (u.status === 'requested') btn = `<button disabled>待确认</button>`;
+                    else if (u.status === 'incoming') btn = `<button class="ok" onclick="addFriend(${u.id})">接受</button>`;
+                    else btn = `<button class="primary" onclick="addFriend(${u.id})">+ 加好友</button>`;
+                    const roleTag = u.role === 'teacher' ? '<span class="friend-badge">教师</span>' : u.role === 'admin' ? '<span class="friend-badge">管理员</span>' : '';
+                    return `
+                        <div class="friend-item">
+                            <div class="friend-ava">${esc((u.username || '?')[0].toUpperCase())}</div>
+                            <div class="friend-meta">
+                                <div class="friend-name">${esc(u.username)}${roleTag}</div>
+                                <div class="friend-bio">${esc(u.bio || '')}</div>
+                            </div>
+                            <div class="friend-act">${btn}</div>
+                        </div>`;
+                }).join('');
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        async function addFriend(userId) {
+            try {
+                const d = await api('/api/chat/friends/request', { method: 'POST', body: { userId } });
+                showToast(d.message || '已发送', 'success');
+                searchUsers();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+        async function respondFriend(requestId, accept) {
+            try {
+                await api('/api/chat/friends/respond', { method: 'POST', body: { requestId, accept } });
+                showToast(accept ? '已添加好友' : '已拒绝', accept ? 'success' : 'info');
+                renderFriendLists();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+        async function removeFriend(userId, username) {
+            if (!confirm(`确定删除好友「${username}」吗？`)) return;
+            try {
+                await api('/api/chat/friends/' + userId, { method: 'DELETE' });
+                showToast('已删除好友', 'info');
+                renderFriendLists();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+        function startDM(userId, username) {
+            activeTab = 'dm';
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'dm'));
+            loadConversations();
+            openLegacyChat(userId, username);
         }
 
         // ========== 兼容旧版私信 ==========

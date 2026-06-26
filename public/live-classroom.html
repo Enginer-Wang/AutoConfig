@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线课堂 - 学生端</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; min-height: 100vh; }
+        .page-header { padding: 12px 20px; background: #1a1f26; border-bottom: 1px solid #2d3640; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .page-header h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .live-dot { width: 9px; height: 9px; border-radius: 50%; background: #555; }
+        .live-dot.on { background: #f4212e; animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        select { padding: 7px 10px; background: #0d1117; border: 1px solid #2d3640; border-radius: 8px; color: #e7e9ea; font-size: 13px; outline: none; }
+        .btn { padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .btn.help { background: #f4212e; color: #fff; }
+        .btn.ghost { background: #2d3640; color: #e7e9ea; }
+        .nav a { padding: 8px 14px; background: #2d3640; color: #e7e9ea; text-decoration: none; border-radius: 8px; font-size: 13px; }
+
+        .layout { display: flex; gap: 14px; padding: 14px 20px; height: calc(100vh - 60px); }
+        .stage { flex: 1.2; display: flex; flex-direction: column; min-width: 0; }
+        .editor-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .chat-col { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; min-width: 0; }
+
+        .video-box { background: #000; border: 1px solid #2d3640; border-radius: 12px; overflow: hidden; flex: 1; position: relative; display: flex; align-items: center; justify-content: center; }
+        .video-box video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+        .video-box .ph { color: #555; font-size: 14px; text-align: center; }
+        .video-ctrl { display: flex; gap: 8px; padding: 10px 0; }
+
+        .editor-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .editor-head .fname { font-size: 13px; color: #8b98a5; font-family: 'JetBrains Mono', monospace; }
+        .takeover-banner { display: none; background: rgba(244,33,46,0.12); border: 1px solid #f4212e; color: #f4212e; padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 8px; }
+        .takeover-banner.show { display: block; }
+        textarea.editor { flex: 1; width: 100%; background: #0d1117; border: 1px solid #2d3640; border-radius: 10px; color: #e7e9ea; font-family: 'JetBrains Mono', monospace; font-size: 14px; padding: 14px; resize: none; outline: none; line-height: 1.6; }
+        textarea.editor:focus { border-color: #1d9bf0; }
+        .console { height: 90px; background: #0d1117; border: 1px solid #2d3640; border-radius: 10px; margin-top: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #00ba7c; overflow: auto; white-space: pre-wrap; }
+        .console .err { color: #f4212e; }
+        .status-bar { display: flex; gap: 14px; font-size: 11px; color: #8b98a5; padding: 6px 0; flex-wrap: wrap; }
+        .status-bar b { color: #e7e9ea; }
+        .waiting { text-align: center; padding: 60px 20px; color: #8b98a5; }
+        .toast { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+        .toast .t { background: #1d9bf0; color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <h1><span class="live-dot" id="liveDot"></span> 在线课堂 · 学生端</h1>
+        <div class="toolbar">
+            <select id="classSelect" onchange="onClassChange()"><option value="">选择班级...</option></select>
+            <button class="btn help" id="helpBtn" onclick="callTeacher()" disabled>🙋 呼叫老师</button>
+            <span class="nav"><a href="/chat">💬 聊天室</a> <a href="/dashboard">返回</a></span>
+        </div>
+    </div>
+
+    <div class="layout" id="layout">
+        <div class="stage">
+            <div class="video-box">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <div class="ph" id="videoPh">等待老师开始直播…</div>
+                <div class="cc-danmaku" id="danmakuLayer"></div>
+            </div>
+            <div class="video-ctrl">
+                <button class="btn ghost" onclick="toggleFullscreen()">全屏观看</button>
+                <span class="status-bar" id="liveStatus" style="align-items:center">未连接</span>
+            </div>
+        </div>
+        <div class="editor-col">
+            <div class="editor-head">
+                <span class="fname" id="fname">main.js</span>
+                <span style="font-size:12px;color:#8b98a5" id="syncTip"></span>
+            </div>
+            <div class="takeover-banner" id="takeoverBanner">🔴 老师正在接管你的编辑器进行示范，你的修改将与老师同步。</div>
+            <textarea class="editor" id="editor" placeholder="// 进入课堂后在这里编写代码..." spellcheck="false"></textarea>
+            <div class="status-bar">
+                <span>状态 <b id="sbFocus">-</b></span>
+                <span>切屏 <b id="sbTab">0</b>次</span>
+                <span>代码 <b id="sbLines">0</b>行</span>
+            </div>
+            <div style="display:flex;gap:8px;margin:4px 0">
+                <button class="btn ghost" onclick="runCode()">▶ 运行/编译</button>
+            </div>
+            <div class="console" id="console">// 控制台输出...</div>
+        </div>
+        <div class="chat-col">
+            <div style="font-size:13px;color:#8b98a5;margin-bottom:8px;display:flex;align-items:center;gap:6px">💬 课堂互动聊天室</div>
+            <div id="chatMount" style="flex:1;min-height:0">选择班级后自动进入聊天室…</div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="/js/classroom-chat.js"></script>
+    <script>
+        let me = null, ws = null, sessionId = null, classId = null, teacherId = null;
+        let pc = null;
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        const FILE_NAME = 'main.js';
+        // 监控累加器
+        let visibleAccum = 0, hiddenAccum = 0, tabSwitchAccum = 0, keystrokeSinceBeat = false;
+        let heartbeatTimer = null, tickTimer = null, activePollTimer = null;
+        let takeoverOn = false, lastSentCode = '';
+
+        async function api(url, opts = {}) {
+            const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'HTTP ' + res.status); }
+            return res.json();
+        }
+        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+        function toast(msg) {
+            const el = document.createElement('div'); el.className = 't'; el.textContent = msg;
+            document.getElementById('toast').appendChild(el); setTimeout(() => el.remove(), 3500);
+        }
+        function wsSend(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+        async function init() {
+            try { me = await api('/api/auth/me'); } catch { location.href = '/login'; return; }
+            document.getElementById('fname').textContent = FILE_NAME;
+            await loadClasses();
+            connectWS();
+            const qsClass = new URLSearchParams(location.search).get('class');
+            if (qsClass) { document.getElementById('classSelect').value = qsClass; onClassChange(); }
+        }
+
+        async function loadClasses() {
+            try {
+                const d = await api('/api/classes');
+                const sel = document.getElementById('classSelect');
+                (d.classes || []).forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o); });
+            } catch (e) { console.warn(e); }
+        }
+
+        async function onClassChange() {
+            classId = parseInt(document.getElementById('classSelect').value);
+            if (!classId) return;
+            initChat();
+            await checkActive();
+            if (activePollTimer) clearInterval(activePollTimer);
+            activePollTimer = setInterval(checkActive, 5000);
+        }
+
+        let chatReady = false;
+        function initChat() {
+            if (chatReady || !classId) return;
+            chatReady = true;
+            window.__getMyCode = () => document.getElementById('editor').value;
+            ClassroomChat.init({
+                mountEl: document.getElementById('chatMount'),
+                danmakuLayer: document.getElementById('danmakuLayer'),
+                classId, me: me.user || me, isTeacher: false,
+                getWS: () => ws
+            });
+        }
+
+        async function checkActive() {
+            if (!classId || sessionId) return;
+            try {
+                const d = await api('/api/live/active?classId=' + classId);
+                if (d.session) joinSession(d.session);
+            } catch (e) { /* 静默 */ }
+        }
+
+        async function joinSession(session) {
+            if (sessionId) return;
+            try {
+                const d = await api('/api/live/' + session.id + '/join', { method: 'POST' });
+                sessionId = session.id;
+                teacherId = d.session.teacher_id;
+                document.getElementById('liveDot').classList.add('on');
+                document.getElementById('helpBtn').disabled = false;
+                document.getElementById('liveStatus').textContent = '已进入课堂 · 等待画面';
+                wsSend({ type: 'live_subscribe', sessionId, role: 'student' });
+                startMonitoring();
+                toast('已进入课堂，开始上课！');
+            } catch (e) { toast('进入失败: ' + e.message); }
+        }
+
+        // ==================== 专注度监控 ====================
+        function startMonitoring() {
+            if (tickTimer) return;
+            tickTimer = setInterval(() => {
+                if (document.hidden) hiddenAccum++; else visibleAccum++;
+            }, 1000);
+            heartbeatTimer = setInterval(sendHeartbeat, 4000);
+            document.addEventListener('visibilitychange', onVisibility);
+            sendHeartbeat();
+        }
+        function onVisibility() {
+            if (document.hidden) tabSwitchAccum++;
+            document.getElementById('sbFocus').textContent = document.hidden ? '离开' : '专注';
+        }
+
+        async function sendHeartbeat() {
+            if (!sessionId) return;
+            const code = document.getElementById('editor').value;
+            const lines = code ? code.split('\n').length : 0;
+            const curLine = currentLineNumber();
+            const focusState = document.hidden ? 'away' : 'focused';
+            const payload = {
+                focusState,
+                tabSwitchDelta: tabSwitchAccum,
+                awaySecondsDelta: hiddenAccum,
+                watchSecondsDelta: visibleAccum,
+                codeLines: lines,
+                currentFile: FILE_NAME,
+                currentLine: curLine,
+                hasKeystroke: keystrokeSinceBeat,
+                thumbnail: code.slice(0, 220)
+            };
+            // 实时推教师巡课墙
+            wsSend({ type: 'live_status', sessionId, status: { focus_state: focusState, code_lines: lines, current_file: FILE_NAME, current_line: curLine, thumbnail: code.slice(0, 220), tab_switches: undefined } });
+            tabSwitchAccum = 0; hiddenAccum = 0; visibleAccum = 0; keystrokeSinceBeat = false;
+            document.getElementById('sbTab').textContent = (parseInt(document.getElementById('sbTab').textContent) || 0) + (payload.tabSwitchDelta || 0);
+            document.getElementById('sbLines').textContent = lines;
+            try { await api('/api/live/' + sessionId + '/heartbeat', { method: 'POST', body: JSON.stringify(payload) }); } catch {}
+        }
+
+        function currentLineNumber() {
+            const ta = document.getElementById('editor');
+            return ta.value.slice(0, ta.selectionStart).split('\n').length;
+        }
+
+        // ==================== 编辑器 ====================
+        const editor = document.getElementById('editor');
+        editor.addEventListener('input', () => {
+            keystrokeSinceBeat = true;
+            // 接管模式下学生与老师强同步：把变更推给老师
+            if (sessionId && teacherId) {
+                const code = editor.value;
+                if (code !== lastSentCode) {
+                    lastSentCode = code;
+                    wsSend({ type: 'code_sync', sessionId, targetUserId: teacherId, patch: code, cursor: { line: currentLineNumber() } });
+                }
+            }
+        });
+
+        function runCode() {
+            const code = editor.value;
+            const out = document.getElementById('console');
+            const logs = [];
+            const orig = console.log;
+            console.log = (...a) => logs.push(a.join(' '));
+            try {
+                // 仅做语法检查与简单执行（沙箱有限，纯演示）
+                new Function(code)();
+                out.innerHTML = logs.length ? esc(logs.join('\n')) : '// 运行成功，无输出';
+            } catch (e) {
+                out.innerHTML = '<span class="err">编译/运行错误: ' + esc(e.message) + '</span>';
+                if (sessionId) api('/api/live/' + sessionId + '/compile-fail', { method: 'POST' }).catch(() => {});
+            } finally { console.log = orig; }
+        }
+
+        async function callTeacher() {
+            if (!sessionId) return;
+            const msg = prompt('简要描述你的问题（可留空）：') || '我需要帮助';
+            try {
+                await api('/api/live/' + sessionId + '/help', { method: 'POST', body: JSON.stringify({ message: msg }) });
+                toast('已呼叫老师，请稍候…');
+            } catch (e) { toast('呼叫失败: ' + e.message); }
+        }
+
+        function toggleFullscreen() {
+            const v = document.getElementById('remoteVideo');
+            if (v.requestFullscreen) v.requestFullscreen();
+        }
+
+        // ==================== WebRTC 接收（学生）====================
+        function ensurePeer() {
+            if (pc) return pc;
+            pc = new RTCPeerConnection(rtcConfig);
+            pc.ontrack = e => {
+                document.getElementById('remoteVideo').srcObject = e.streams[0];
+                document.getElementById('videoPh').style.display = 'none';
+                document.getElementById('liveStatus').textContent = '🔴 直播中';
+            };
+            pc.onicecandidate = e => { if (e.candidate && teacherId) wsSend({ type: 'webrtc_signal', sessionId, targetUserId: teacherId, kind: 'ice', signal: e.candidate }); };
+            return pc;
+        }
+
+        async function onSignal(m) {
+            teacherId = teacherId || m.fromUserId;
+            const conn = ensurePeer();
+            if (m.kind === 'offer') {
+                await conn.setRemoteDescription(m.signal);
+                const ans = await conn.createAnswer();
+                await conn.setLocalDescription(ans);
+                wsSend({ type: 'webrtc_signal', sessionId, targetUserId: m.fromUserId, kind: 'answer', signal: conn.localDescription });
+            } else if (m.kind === 'ice') {
+                try { await conn.addIceCandidate(m.signal); } catch {}
+            }
+        }
+
+        // ==================== WebSocket ====================
+        function connectWS() {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${proto}//${location.host}/ws`);
+            ws.onopen = () => { const token = document.cookie.match(/token=([^;]+)/)?.[1]; if (token) ws.send(JSON.stringify({ type: 'auth', token })); };
+            ws.onmessage = ev => { let m; try { m = JSON.parse(ev.data); } catch { return; } handleWS(m); };
+            ws.onclose = () => setTimeout(connectWS, 2000);
+        }
+
+        function handleWS(m) {
+            switch (m.type) {
+                case 'auth_ok':
+                    if (sessionId) wsSend({ type: 'live_subscribe', sessionId, role: 'student' });
+                    if (window.ClassroomChat && ClassroomChat.getRoomId()) wsSend({ type: 'join_room', roomId: ClassroomChat.getRoomId() });
+                    break;
+                case 'live_ended':
+                    document.getElementById('liveDot').classList.remove('on');
+                    document.getElementById('liveStatus').textContent = '课堂已结束';
+                    editor.readOnly = true;
+                    toast('老师已下课，你的代码已存档为课后练习。');
+                    if (heartbeatTimer) clearInterval(heartbeatTimer);
+                    if (tickTimer) clearInterval(tickTimer);
+                    sessionId = null;
+                    break;
+                case 'webrtc_signal':
+                    onSignal(m); break;
+                case 'takeover':
+                    takeoverOn = m.on;
+                    document.getElementById('takeoverBanner').classList.toggle('show', m.on);
+                    break;
+                case 'code_sync':
+                    // 老师请求完整代码 或 老师接管推送修改
+                    if (m.cursor && m.cursor.request) {
+                        wsSend({ type: 'code_sync', sessionId, targetUserId: m.fromUserId, patch: editor.value, cursor: { line: currentLineNumber() } });
+                    } else if (m.cursor && m.cursor.teacher && m.patch != null) {
+                        // 老师接管修改 → 强同步到学生编辑器
+                        const pos = editor.selectionStart;
+                        editor.value = m.patch; lastSentCode = m.patch;
+                        try { editor.setSelectionRange(pos, pos); } catch {}
+                        document.getElementById('syncTip').textContent = '老师已修改 ✎';
+                        setTimeout(() => { document.getElementById('syncTip').textContent = ''; }, 1500);
+                    }
+                    break;
+                default:
+                    if (window.ClassroomChat) ClassroomChat.handleWS(m);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

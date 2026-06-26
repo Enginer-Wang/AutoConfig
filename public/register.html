@@ -7,6 +7,25 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☁️</text></svg>">
+    <style>
+        .level-pick { display: flex; gap: 8px; }
+        .level-opt { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; padding: 9px 6px; border-radius: 8px; background: rgba(99,102,241,.08); border: 2px solid transparent; color: #94a3b8; font-size: .9rem; transition: all .2s; }
+        .level-opt.active { background: rgba(99,102,241,.15); border-color: #6366f1; color: #c7d2fe; }
+        .level-opt input { display: none; }
+        .class-picker { position: relative; }
+        .class-results { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; background: #1a1a35; border: 1px solid rgba(99,102,241,.3); border-radius: 10px; overflow: hidden; z-index: 20; max-height: 240px; overflow-y: auto; display: none; box-shadow: 0 12px 32px rgba(0,0,0,.4); }
+        .class-results.show { display: block; }
+        .class-results .ci { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid rgba(99,102,241,.08); transition: background .15s; }
+        .class-results .ci:last-child { border-bottom: none; }
+        .class-results .ci:hover { background: rgba(99,102,241,.15); }
+        .class-results .ci .cn { color: #e2e8f0; font-size: .95rem; font-weight: 600; }
+        .class-results .ci .cm { color: #94a3b8; font-size: .78rem; margin-top: 2px; }
+        .class-results .ci.create { color: #34d399; font-weight: 600; }
+        .class-results .none { padding: 12px 14px; color: #94a3b8; font-size: .85rem; }
+        .class-selected { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding: 10px 14px; border-radius: 10px; background: rgba(52,211,153,.12); border: 1px solid rgba(52,211,153,.4); color: #6ee7b7; font-size: .9rem; }
+        .class-selected .x { cursor: pointer; color: #94a3b8; font-weight: 700; padding: 0 4px; }
+        .class-selected .x:hover { color: #f87171; }
+    </style>
 </head>
 <body>
     <div class="auth-page">
@@ -54,6 +73,27 @@
                     <input type="text" id="school" class="form-input" placeholder="请输入所在学校" autocomplete="organization">
                 </div>
                 <div class="form-group">
+                    <label>年级学段</label>
+                    <div class="level-pick" id="levelPick">
+                        <label class="level-opt active"><input type="radio" name="schoolLevel" value="elementary" checked> 🧒 小学</label>
+                        <label class="level-opt"><input type="radio" name="schoolLevel" value="middle"> 🧑‍🎓 初中</label>
+                        <label class="level-opt"><input type="radio" name="schoolLevel" value="high"> 🎓 高中</label>
+                    </div>
+                </div>
+                <div class="form-group" id="classGroup">
+                    <label for="classSearch">所在班级 <span id="classHint" style="color:#94a3b8;font-size:.8rem;">（搜索并选择，进入后只看本年级课件）</span></label>
+                    <div class="class-picker">
+                        <input type="text" id="classSearch" class="form-input" placeholder="输入班级名称搜索…" autocomplete="off">
+                        <div class="class-results" id="classResults"></div>
+                        <div class="class-selected" id="classSelected" style="display:none;"></div>
+                        <div class="class-create" id="classCreate" style="display:none;"></div>
+                    </div>
+                </div>
+                <div class="form-group" id="inviteCodeGroup">
+                    <label for="inviteCode">教师邀请码 <span style="color:#f59e0b;font-size:.8rem;">（教师注册必填，向管理员索取）</span></label>
+                    <input type="text" id="inviteCode" class="form-input" placeholder="请输入管理员提供的邀请码" autocomplete="off" style="text-transform:uppercase">
+                </div>
+                <div class="form-group">
                     <label for="password">密码</label>
                     <input type="password" id="password" class="form-input" placeholder="至少6个字符" required minlength="6" autocomplete="new-password">
                 </div>
@@ -72,6 +112,21 @@
 
     <script src="js/common.js"></script>
     <script>
+        // 学段选择样式切换
+        document.querySelectorAll('input[name="schoolLevel"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                document.querySelectorAll('#levelPick .level-opt').forEach(l => {
+                    l.classList.toggle('active', l.querySelector('input').checked);
+                });
+                // 学段变更后重新搜索班级
+                clearSelectedClass();
+                doClassSearch();
+            });
+        });
+        function getLevel() {
+            return document.querySelector('input[name="schoolLevel"]:checked').value;
+        }
+
         // 角色选择样式切换
         document.querySelectorAll('input[name="role"]').forEach(radio => {
             radio.addEventListener('change', () => {
@@ -87,8 +142,106 @@
                         label.style.color = '#94a3b8';
                     }
                 });
+                toggleInviteField();
+                updateClassHint();
+                clearSelectedClass();
+                doClassSearch();
             });
         });
+
+        function isTeacherRole() {
+            return document.querySelector('input[name="role"]:checked').value === 'teacher';
+        }
+
+        // 教师角色显示邀请码字段
+        function toggleInviteField() {
+            document.getElementById('inviteCodeGroup').style.display = isTeacherRole() ? 'block' : 'none';
+        }
+        toggleInviteField();
+
+        function updateClassHint() {
+            document.getElementById('classHint').textContent = isTeacherRole()
+                ? '（搜索已有班级加入，或输入新名称创建班级）'
+                : '（搜索并选择你所在的班级，进入后只看本年级课件）';
+        }
+        updateClassHint();
+
+        // ==================== 班级搜索 / 选择 / 创建 ====================
+        let selectedClassId = null;   // 选中已有班级
+        let createClassName = null;   // 教师新建班级名
+        let searchTimer = null;
+
+        const classSearchEl = document.getElementById('classSearch');
+        const classResultsEl = document.getElementById('classResults');
+        const classSelectedEl = document.getElementById('classSelected');
+
+        classSearchEl.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(doClassSearch, 250);
+        });
+        classSearchEl.addEventListener('focus', doClassSearch);
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.class-picker')) classResultsEl.classList.remove('show');
+        });
+
+        async function doClassSearch() {
+            const q = classSearchEl.value.trim();
+            const level = getLevel();
+            let classes = [];
+            try {
+                const params = new URLSearchParams({ level });
+                if (q) params.set('q', q);
+                const data = await api('/api/auth/classes/search?' + params.toString());
+                classes = data.classes || [];
+            } catch { classes = []; }
+            renderClassResults(classes, q);
+        }
+
+        function renderClassResults(classes, q) {
+            const items = [];
+            const levelName = { elementary: '小学', middle: '初中', high: '高中' }[getLevel()];
+            classes.forEach(c => {
+                items.push(`<div class="ci" onclick="pickClass(${c.id}, ${JSON.stringify(c.name).replace(/"/g, '&quot;')})">
+                    <div class="cn">${escapeHtml(c.name)}</div>
+                    <div class="cm">${levelName} · 班主任 ${escapeHtml(c.teacher_name)} · ${c.member_count} 名学生</div>
+                </div>`);
+            });
+            // 教师：无完全同名时可创建
+            if (isTeacherRole() && q && !classes.some(c => c.name === q)) {
+                items.push(`<div class="ci create" onclick="pickCreate(${JSON.stringify(q).replace(/"/g, '&quot;')})">
+                    ➕ 创建新班级「${escapeHtml(q)}」（${levelName}）
+                </div>`);
+            }
+            if (!items.length) {
+                items.push(`<div class="none">${q ? '未找到匹配的班级' : '输入名称搜索班级'}${isTeacherRole() ? '，可输入新名称创建' : '，请向老师确认班级名称'}</div>`);
+            }
+            classResultsEl.innerHTML = items.join('');
+            classResultsEl.classList.add('show');
+        }
+
+        function pickClass(id, name) {
+            selectedClassId = id;
+            createClassName = null;
+            showSelected('✅ 已选择班级：' + name);
+        }
+        function pickCreate(name) {
+            createClassName = name;
+            selectedClassId = null;
+            showSelected('➕ 将创建新班级：' + name);
+        }
+        function showSelected(text) {
+            classResultsEl.classList.remove('show');
+            classSearchEl.style.display = 'none';
+            classSelectedEl.style.display = 'flex';
+            classSelectedEl.innerHTML = `<span>${escapeHtml(text)}</span><span class="x" onclick="clearSelectedClass()">✕</span>`;
+        }
+        function clearSelectedClass() {
+            selectedClassId = null;
+            createClassName = null;
+            classSelectedEl.style.display = 'none';
+            classSearchEl.style.display = 'block';
+            classSearchEl.value = '';
+        }
 
         // 已登录则跳转
         (async () => {
@@ -110,6 +263,23 @@
                 return;
             }
 
+            const role = document.querySelector('input[name="role"]:checked').value;
+            const inviteCode = document.getElementById('inviteCode').value.trim();
+            if (role === 'teacher' && !inviteCode) {
+                errorEl.textContent = '教师注册需要邀请码，请向管理员索取';
+                errorEl.classList.add('show');
+                return;
+            }
+
+            // 班级校验：学生必须选已有班级；教师需选已有或新建
+            if (!selectedClassId && !createClassName) {
+                errorEl.textContent = role === 'teacher'
+                    ? '请选择已有班级或输入新班级名称'
+                    : '请搜索并选择你所在的班级';
+                errorEl.classList.add('show');
+                return;
+            }
+
             btn.disabled = true;
             btn.textContent = '注册中...';
             errorEl.classList.remove('show');
@@ -121,8 +291,12 @@
                         username: document.getElementById('username').value,
                         email: document.getElementById('email').value,
                         password: password,
-                        role: document.querySelector('input[name="role"]:checked').value,
-                        school: document.getElementById('school').value
+                        role: role,
+                        school: document.getElementById('school').value,
+                        schoolLevel: getLevel(),
+                        classId: selectedClassId || undefined,
+                        className: createClassName || undefined,
+                        inviteCode: inviteCode
                     }
                 });
 

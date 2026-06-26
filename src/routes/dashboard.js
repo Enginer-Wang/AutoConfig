@@ -449,28 +449,27 @@ router.get('/analytics/code-activity/:classId', (req, res) => {
 
     // 每日代码活跃度趋势（按日聚合）
     const dailyActivity = db.prepare(`
-        SELECT DATE(created_at) as date,
+        SELECT date,
             SUM(lines_added) as total_lines_added,
             SUM(lines_deleted) as total_lines_deleted,
             COUNT(DISTINCT user_id) as active_students,
-            SUM(total_keystrokes) as total_keystrokes
+            SUM(lines_added + lines_deleted) as total_keystrokes
         FROM code_activity
-        WHERE class_id = ? AND created_at >= datetime('now', ?)
-        GROUP BY DATE(created_at)
+        WHERE class_id = ? AND date >= date('now', ?)
+        GROUP BY date
         ORDER BY date ASC
     `).all(classId, `-${lookbackDays} days`);
 
     // 夜猫排行（22:00~06:00 活动最多的学生）
     const nightOwlRanking = db.prepare(`
         SELECT u.id, u.username, u.avatar,
-            SUM(ca.total_keystrokes) as night_keystrokes,
+            SUM(ca.lines_added + ca.lines_deleted) as night_keystrokes,
             COUNT(*) as night_sessions
         FROM code_activity ca
         JOIN users u ON ca.user_id = u.id
         WHERE ca.class_id = ?
-            AND (CAST(strftime('%H', ca.created_at) AS INTEGER) >= 22
-                 OR CAST(strftime('%H', ca.created_at) AS INTEGER) < 6)
-            AND ca.created_at >= datetime('now', '-30 days')
+            AND (ca.hour >= 22 OR ca.hour < 6)
+            AND ca.date >= date('now', '-30 days')
         GROUP BY ca.user_id
         ORDER BY night_keystrokes DESC
         LIMIT 10
@@ -478,10 +477,10 @@ router.get('/analytics/code-activity/:classId', (req, res) => {
 
     // 每小时分布
     const hourlyDistribution = db.prepare(`
-        SELECT CAST(strftime('%H', created_at) AS INTEGER) as hour,
-            SUM(total_keystrokes) as keystrokes
+        SELECT hour,
+            SUM(lines_added + lines_deleted) as keystrokes
         FROM code_activity
-        WHERE class_id = ? AND created_at >= datetime('now', '-30 days')
+        WHERE class_id = ? AND date >= date('now', '-30 days')
         GROUP BY hour
         ORDER BY hour ASC
     `).all(classId);
@@ -490,11 +489,11 @@ router.get('/analytics/code-activity/:classId', (req, res) => {
     const studentRanking = db.prepare(`
         SELECT u.id, u.username, u.avatar,
             SUM(ca.lines_added) as total_lines,
-            SUM(ca.total_keystrokes) as total_keystrokes,
-            COUNT(DISTINCT DATE(ca.created_at)) as active_days
+            SUM(ca.lines_added + ca.lines_deleted) as total_keystrokes,
+            COUNT(DISTINCT ca.date) as active_days
         FROM code_activity ca
         JOIN users u ON ca.user_id = u.id
-        WHERE ca.class_id = ? AND ca.created_at >= datetime('now', ?)
+        WHERE ca.class_id = ? AND ca.date >= date('now', ?)
         GROUP BY ca.user_id
         ORDER BY total_lines DESC
         LIMIT 20
@@ -620,10 +619,10 @@ router.get('/analytics/student-profile/:userId', (req, res) => {
 
     // 代码活跃度
     const codeActivity = db.prepare(`
-        SELECT DATE(created_at) as date, SUM(lines_added) as lines, SUM(total_keystrokes) as keystrokes
+        SELECT date, SUM(lines_added) as lines, SUM(lines_added + lines_deleted) as keystrokes
         FROM code_activity
         WHERE user_id = ?
-        GROUP BY DATE(created_at)
+        GROUP BY date
         ORDER BY date DESC
         LIMIT 30
     `).all(userId);

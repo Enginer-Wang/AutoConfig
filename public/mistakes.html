@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错题本 - Autoconfig</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; min-height: 100vh; }
+
+        .page-header { padding: 20px 32px; background: #1a1f26; border-bottom: 1px solid #2d3640; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .page-header h1 { font-size: 20px; }
+        .page-header .nav { display: flex; gap: 8px; flex-wrap: wrap; }
+        .page-header .nav a { padding: 8px 16px; background: #2d3640; color: #e7e9ea; text-decoration: none; border-radius: 8px; font-size: 13px; }
+
+        .container { max-width: 960px; margin: 0 auto; padding: 24px; }
+
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: #1a1f26; border: 1px solid #2d3640; border-radius: 12px; padding: 16px; }
+        .stat-card .num { font-size: 26px; font-weight: 700; }
+        .stat-card .label { font-size: 12px; color: #8b98a5; margin-top: 4px; }
+        .stat-card.red .num { color: #f4212e; }
+        .stat-card.yellow .num { color: #ffb800; }
+        .stat-card.green .num { color: #00ba7c; }
+        .stat-card.blue .num { color: #1d9bf0; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; background: #1a1f26; padding: 4px; border-radius: 10px; }
+        .tabs .tab { flex: 1; padding: 10px 16px; text-align: center; border-radius: 8px; cursor: pointer; font-size: 14px; color: #8b98a5; transition: all 0.2s; }
+        .tabs .tab.active { background: #1d9bf0; color: #fff; font-weight: 600; }
+
+        .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .chip { padding: 6px 14px; background: #1a1f26; border: 1px solid #2d3640; border-radius: 20px; cursor: pointer; font-size: 13px; color: #8b98a5; }
+        .chip.active { background: rgba(29,155,240,0.15); border-color: #1d9bf0; color: #1d9bf0; }
+        select { padding: 7px 12px; background: #0d1117; border: 1px solid #2d3640; border-radius: 8px; color: #e7e9ea; font-size: 13px; outline: none; }
+
+        .mistake-card { background: #1a1f26; border: 1px solid #2d3640; border-radius: 12px; padding: 18px; margin-bottom: 14px; border-left: 4px solid #f4212e; }
+        .mistake-card.reviewing { border-left-color: #ffb800; }
+        .mistake-card.mastered { border-left-color: #00ba7c; }
+        .mistake-card .mc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+        .mistake-card .mc-title { font-size: 15px; font-weight: 600; flex: 1; }
+        .mistake-card .mc-meta { font-size: 11px; color: #8b98a5; margin-top: 4px; }
+        .mistake-card .mc-meta span { margin-right: 10px; }
+        .badge { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600; white-space: nowrap; }
+        .badge.unmastered { background: rgba(244,33,46,0.15); color: #f4212e; }
+        .badge.reviewing { background: rgba(255,184,0,0.15); color: #ffb800; }
+        .badge.mastered { background: rgba(0,186,124,0.15); color: #00ba7c; }
+
+        .q-content { font-size: 13px; color: #b3bcc4; margin-bottom: 12px; white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; background: #0d1117; padding: 10px; border-radius: 6px; }
+        .option-choice { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 6px; background: #15191e; border: 1px solid #2d3640; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .option-choice:hover { border-color: #1d9bf0; }
+        .option-choice.selected { border-color: #1d9bf0; background: rgba(29,155,240,0.1); }
+        .option-choice.correct { border-color: #00ba7c; background: rgba(0,186,124,0.1); }
+        .option-choice.wrong { border-color: #f4212e; background: rgba(244,33,46,0.1); }
+        .option-choice .letter { width: 24px; height: 24px; border-radius: 50%; background: #2d3640; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+        .code-fill textarea { width: 100%; min-height: 70px; padding: 10px; background: #0d1117; border: 1px solid #2d3640; border-radius: 6px; color: #e7e9ea; font-family: 'JetBrains Mono', monospace; font-size: 13px; resize: vertical; outline: none; }
+        .code-fill textarea:focus { border-color: #1d9bf0; }
+
+        .retry-result { padding: 10px 14px; border-radius: 8px; margin-top: 10px; font-size: 13px; font-weight: 600; }
+        .retry-result.ok { background: rgba(0,186,124,0.1); border: 1px solid #00ba7c; color: #00ba7c; }
+        .retry-result.no { background: rgba(244,33,46,0.1); border: 1px solid #f4212e; color: #f4212e; }
+
+        .note-area { margin-top: 12px; }
+        .note-area textarea { width: 100%; min-height: 50px; padding: 8px 10px; background: #0d1117; border: 1px solid #2d3640; border-radius: 6px; color: #e7e9ea; font-size: 13px; resize: vertical; outline: none; }
+        .note-area textarea:focus { border-color: #1d9bf0; }
+
+        .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+        .btn-primary { background: #1d9bf0; color: #fff; }
+        .btn-success { background: #00ba7c; color: #fff; }
+        .btn-secondary { background: #2d3640; color: #e7e9ea; }
+        .btn-danger { background: #f4212e; color: #fff; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        .empty { text-align: center; color: #8b98a5; padding: 60px 20px; }
+        .empty .big { font-size: 40px; margin-bottom: 12px; }
+
+        /* 教师高频错题 */
+        .hot-item { background: #1a1f26; border: 1px solid #2d3640; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+        .hot-item .ht-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+        .hot-item .ht-bar { height: 8px; background: #2d3640; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+        .hot-item .ht-bar .fill { height: 100%; background: linear-gradient(90deg, #f4212e, #ffb800); }
+        .hot-item .ht-meta { font-size: 12px; color: #8b98a5; display: flex; gap: 16px; flex-wrap: wrap; }
+        .hot-item .ht-answer { font-size: 12px; color: #00ba7c; margin-top: 6px; font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <h1>📕 错题本</h1>
+        <div class="nav">
+            <a href="/instant-quiz">⚡ 即时作业</a>
+            <a href="/class-analytics">📊 学情看板</a>
+            <a href="/homework">📝 作业</a>
+            <a href="/dashboard">🏠 控制台</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="tabs" id="mainTabs">
+            <div class="tab active" data-tab="my" onclick="switchTab('my')">📖 我的错题</div>
+            <div class="tab" data-tab="class" id="classTabBtn" onclick="switchTab('class')" style="display:none">🔥 班级高频错题</div>
+        </div>
+
+        <!-- 我的错题 -->
+        <div id="tabMy">
+            <div class="stat-grid" id="statGrid"></div>
+            <div class="filter-bar" id="statusFilter">
+                <div class="chip active" data-status="" onclick="setStatus('')">全部</div>
+                <div class="chip" data-status="unmastered" onclick="setStatus('unmastered')">❌ 未掌握</div>
+                <div class="chip" data-status="reviewing" onclick="setStatus('reviewing')">🔄 复习中</div>
+                <div class="chip" data-status="mastered" onclick="setStatus('mastered')">✅ 已掌握</div>
+                <select id="subjectFilter" onchange="loadMistakes()"><option value="">全部学科</option></select>
+            </div>
+            <div id="mistakeList"></div>
+        </div>
+
+        <!-- 教师班级高频错题 -->
+        <div id="tabClass" style="display:none">
+            <div class="filter-bar">
+                <select id="classSelect" onchange="loadHotQuestions()"><option value="">选择班级...</option></select>
+            </div>
+            <div id="hotList"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentStatus = '';
+        let me = null;
+
+        async function api(url, opts = {}) {
+            const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({ error: 'HTTP ' + res.status }));
+                throw new Error(e.error || ('HTTP ' + res.status));
+            }
+            return res.json();
+        }
+
+        function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+        async function init() {
+            try {
+                me = await api('/api/auth/me');
+            } catch (e) {
+                location.href = '/login';
+                return;
+            }
+            const role = me.user ? me.user.role : me.role;
+            if (role === 'teacher' || role === 'admin') {
+                document.getElementById('classTabBtn').style.display = '';
+                loadClasses();
+            }
+            loadStats();
+            loadMistakes();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('#mainTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            document.getElementById('tabMy').style.display = tab === 'my' ? '' : 'none';
+            document.getElementById('tabClass').style.display = tab === 'class' ? '' : 'none';
+        }
+
+        function setStatus(s) {
+            currentStatus = s;
+            document.querySelectorAll('#statusFilter .chip').forEach(c => c.classList.toggle('active', c.dataset.status === s));
+            loadMistakes();
+        }
+
+        async function loadStats() {
+            try {
+                const s = await api('/api/mistakes/stats');
+                document.getElementById('statGrid').innerHTML = `
+                    <div class="stat-card blue"><div class="num">${s.total}</div><div class="label">错题总数</div></div>
+                    <div class="stat-card red"><div class="num">${s.byStatus.unmastered}</div><div class="label">未掌握</div></div>
+                    <div class="stat-card yellow"><div class="num">${s.byStatus.reviewing}</div><div class="label">复习中</div></div>
+                    <div class="stat-card green"><div class="num">${s.byStatus.mastered}</div><div class="label">已掌握</div></div>
+                    <div class="stat-card green"><div class="num">${s.masteryRate}%</div><div class="label">掌握率</div></div>
+                `;
+                const sel = document.getElementById('subjectFilter');
+                const cur = sel.value;
+                sel.innerHTML = '<option value="">全部学科</option>' +
+                    s.bySubject.map(x => `<option value="${esc(x.subject === '未分类' ? '' : x.subject)}">${esc(x.subject)} (${x.count})</option>`).join('');
+                sel.value = cur;
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadMistakes() {
+            const subject = document.getElementById('subjectFilter').value;
+            const params = new URLSearchParams();
+            if (currentStatus) params.set('status', currentStatus);
+            if (subject) params.set('subject', subject);
+            try {
+                const { mistakes } = await api('/api/mistakes?' + params.toString());
+                const box = document.getElementById('mistakeList');
+                if (!mistakes.length) {
+                    box.innerHTML = `<div class="empty"><div class="big">🎉</div>暂无错题，继续保持！</div>`;
+                    return;
+                }
+                box.innerHTML = mistakes.map(renderMistake).join('');
+            } catch (e) {
+                document.getElementById('mistakeList').innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+            }
+        }
+
+        function renderMistake(m) {
+            const statusLabel = { unmastered: '未掌握', reviewing: '复习中', mastered: '已掌握' }[m.mastery_status];
+            let answerArea = '';
+            if (m.question_type === 'mcq' || m.question_type === 'true_false') {
+                answerArea = (m.options || []).map((opt, i) => {
+                    const letter = String.fromCharCode(65 + i);
+                    return `<div class="option-choice" data-letter="${letter}" onclick="pickOption(${m.id}, this)">
+                        <div class="letter">${letter}</div><div>${esc(opt)}</div></div>`;
+                }).join('');
+            } else {
+                answerArea = `<div class="code-fill"><textarea id="ans-${m.id}" placeholder="${m.question_type === 'code_fill' ? '填写代码...' : '输入答案...'}">${esc(m.code_template || '')}</textarea></div>`;
+            }
+            return `<div class="mistake-card ${m.mastery_status}" id="card-${m.id}">
+                <div class="mc-head">
+                    <div>
+                        <div class="mc-title">${esc(m.title)}</div>
+                        <div class="mc-meta">
+                            <span>📚 ${esc(m.subject || '未分类')}</span>
+                            <span>📝 ${esc(m.quiz_title || '测验')}</span>
+                            <span>❌ 错 ${m.wrong_count} 次</span>
+                            <span>🔄 重练 ${m.retry_count} 次</span>
+                        </div>
+                    </div>
+                    <span class="badge ${m.mastery_status}">${statusLabel}</span>
+                </div>
+                ${m.content ? `<div class="q-content">${esc(m.content)}</div>` : ''}
+                <div data-answer-area>${answerArea}</div>
+                <div id="result-${m.id}"></div>
+                <div class="note-area"><textarea id="note-${m.id}" placeholder="写下你的解题心得 / 易错点...">${esc(m.note || '')}</textarea></div>
+                <div class="actions">
+                    <button class="btn btn-primary btn-sm" onclick="retry(${m.id}, '${m.question_type}')">🔁 重练此题</button>
+                    <button class="btn btn-secondary btn-sm" onclick="saveNote(${m.id})">💾 保存笔记</button>
+                    <button class="btn btn-danger btn-sm" onclick="removeMistake(${m.id})">🗑 移除</button>
+                </div>
+            </div>`;
+        }
+
+        const picked = {};
+        function pickOption(id, el) {
+            const card = document.getElementById('card-' + id);
+            card.querySelectorAll('.option-choice').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            picked[id] = el.dataset.letter;
+        }
+
+        async function retry(id, type) {
+            let answer;
+            if (type === 'mcq' || type === 'true_false') {
+                answer = picked[id];
+                if (!answer) { alert('请先选择一个选项'); return; }
+            } else {
+                answer = document.getElementById('ans-' + id).value;
+            }
+            try {
+                const r = await api(`/api/mistakes/${id}/retry`, { method: 'POST', body: JSON.stringify({ answer }) });
+                const box = document.getElementById('result-' + id);
+                if (r.is_correct) {
+                    box.innerHTML = `<div class="retry-result ok">✅ 回答正确！${r.rewarded ? ' 🪙 已攻克错题 +1金币' : ''} 当前状态：${{ reviewing: '复习中', mastered: '已掌握' }[r.mastery_status]}</div>`;
+                } else {
+                    box.innerHTML = `<div class="retry-result no">❌ 还不对，正确答案：<code>${esc(r.correct_answer)}</code></div>`;
+                }
+                loadStats();
+                setTimeout(loadMistakes, 1200);
+            } catch (e) { alert('提交失败：' + e.message); }
+        }
+
+        async function saveNote(id) {
+            const note = document.getElementById('note-' + id).value;
+            try {
+                await api(`/api/mistakes/${id}/note`, { method: 'PUT', body: JSON.stringify({ note }) });
+                const box = document.getElementById('result-' + id);
+                box.innerHTML = `<div class="retry-result ok">💾 笔记已保存</div>`;
+                setTimeout(() => { box.innerHTML = ''; }, 1500);
+            } catch (e) { alert('保存失败：' + e.message); }
+        }
+
+        async function removeMistake(id) {
+            if (!confirm('确定从错题本移除这道题？')) return;
+            try {
+                await api(`/api/mistakes/${id}`, { method: 'DELETE' });
+                document.getElementById('card-' + id).remove();
+                loadStats();
+            } catch (e) { alert('移除失败：' + e.message); }
+        }
+
+        // ===== 教师：班级高频错题 =====
+        async function loadClasses() {
+            try {
+                const data = await api('/api/classes');
+                const list = data.classes || data || [];
+                const sel = document.getElementById('classSelect');
+                sel.innerHTML = '<option value="">选择班级...</option>' +
+                    list.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadHotQuestions() {
+            const classId = document.getElementById('classSelect').value;
+            const box = document.getElementById('hotList');
+            if (!classId) { box.innerHTML = ''; return; }
+            try {
+                const { hotQuestions, totalStudents } = await api(`/api/mistakes/class/${classId}`);
+                if (!hotQuestions.length) {
+                    box.innerHTML = `<div class="empty"><div class="big">👍</div>本班暂无归集的错题</div>`;
+                    return;
+                }
+                box.innerHTML = hotQuestions.map(q => {
+                    const pct = totalStudents > 0 ? Math.round((q.wrong_students / totalStudents) * 100) : 0;
+                    return `<div class="hot-item">
+                        <div class="ht-title">${esc(q.title)}</div>
+                        <div class="ht-bar"><div class="fill" style="width:${pct}%"></div></div>
+                        <div class="ht-meta">
+                            <span>👥 ${q.wrong_students}/${totalStudents} 人错（${pct}%）</span>
+                            <span>❌ 共错 ${q.total_wrongs} 次</span>
+                            <span>✅ 已攻克 ${q.mastered_students} 人</span>
+                            <span>📝 ${esc(q.quiz_title || '测验')}</span>
+                        </div>
+                        <div class="ht-answer">正确答案：${esc(q.correct_answer)}</div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

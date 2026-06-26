@@ -2,6 +2,13 @@
  * Autoconfig - 公共 JS 工具库
  */
 
+// HTML 转义（防 XSS，供各页面统一调用）
+function escapeHtml(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
 // Toast 通知
 function showToast(message, type = 'info') {
     let container = document.querySelector('.toast-container');

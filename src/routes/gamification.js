@@ -20,7 +20,7 @@ router.get('/my-coins', (req, res) => {
 
     const info = db.prepare('SELECT coins, level FROM users WHERE id = ?').get(user.id);
     const items = db.prepare(`
-        SELECT ui.*, ci.name, ci.description, ci.icon, ci.category
+        SELECT ui.*, ci.name, ci.description, ci.icon, ci.type AS category, ci.slug, ci.effect
         FROM user_items ui
         JOIN coin_items ci ON ui.item_id = ci.id
         WHERE ui.user_id = ? AND ui.quantity > 0
@@ -38,7 +38,7 @@ router.get('/my-coins', (req, res) => {
 // 获取商店物品列表
 router.get('/shop', (req, res) => {
     const db = getDb();
-    const items = db.prepare('SELECT * FROM coin_items WHERE is_active = 1 ORDER BY category, price ASC').all();
+    const items = db.prepare('SELECT * FROM coin_items WHERE is_active = 1 ORDER BY type, price ASC').all();
     res.json({ items });
 });
 
@@ -84,7 +84,7 @@ router.post('/items/use', (req, res) => {
     // context: 使用场景 (可选)
 
     const userItem = db.prepare(`
-        SELECT ui.*, ci.category, ci.effect_type, ci.effect_value
+        SELECT ui.*, ci.slug, ci.type, ci.effect, ci.name
         FROM user_items ui
         JOIN coin_items ci ON ui.item_id = ci.id
         WHERE ui.user_id = ? AND ui.item_id = ? AND ui.quantity > 0
@@ -94,67 +94,65 @@ router.post('/items/use', (req, res) => {
         return res.status(400).json({ error: '你没有该道具或已用完' });
     }
 
-    // 根据道具类型执行效果
+    // 解析道具效果（存储为 JSON）
+    let effect = {};
+    try { effect = JSON.parse(userItem.effect || '{}'); } catch (e) { effect = {}; }
+
+    // 根据道具效果执行
     let effectResult = {};
 
-    switch (userItem.effect_type) {
-        case 'late_pass': {
-            // 迟交券：允许该作业延迟48小时提交
-            if (!targetId) return res.status(400).json({ error: '请指定作业ID' });
-            const hw = db.prepare('SELECT * FROM homework WHERE id = ?').get(parseInt(targetId));
-            if (!hw) return res.status(404).json({ error: '作业不存在' });
-            
-            // 记录延期
-            const newDue = new Date(new Date(hw.due_date).getTime() + 48 * 60 * 60 * 1000).toISOString();
-            // 存个人延期记录（不影响全局截止时间）
-            try {
-                db.prepare('ALTER TABLE homework_submissions ADD COLUMN personal_due_date TEXT').run();
-            } catch (e) { /* 列已存在 */ }
-            db.prepare(`
-                UPDATE homework_submissions SET personal_due_date = ? 
-                WHERE homework_id = ? AND student_id = ?
-            `).run(newDue, parseInt(targetId), user.id);
-            effectResult = { newDueDate: newDue };
-            break;
+    if (effect.extend_days) {
+        // 迟交券：允许该作业个人延期 N 天提交（不影响全局截止时间）
+        if (!targetId) return res.status(400).json({ error: '请指定作业ID' });
+        const hw = db.prepare('SELECT * FROM homework WHERE id = ?').get(parseInt(targetId));
+        if (!hw) return res.status(404).json({ error: '作业不存在' });
+        const baseDue = hw.due_date ? new Date(hw.due_date).getTime() : Date.now();
+        const newDue = new Date(baseDue + effect.extend_days * 24 * 60 * 60 * 1000).toISOString();
+        try { db.prepare('ALTER TABLE homework_submissions ADD COLUMN personal_due_date TEXT').run(); } catch (e) { /* 列已存在 */ }
+        // 若尚无提交记录则插入占位，确保延期生效
+        const sub = db.prepare('SELECT id FROM homework_submissions WHERE homework_id = ? AND student_id = ?')
+            .get(parseInt(targetId), user.id);
+        if (sub) {
+            db.prepare('UPDATE homework_submissions SET personal_due_date = ? WHERE homework_id = ? AND student_id = ?')
+                .run(newDue, parseInt(targetId), user.id);
+        } else {
+            db.prepare('INSERT INTO homework_submissions (homework_id, student_id, status, personal_due_date) VALUES (?, ?, ?, ?)')
+                .run(parseInt(targetId), user.id, 'draft', newDue);
         }
-        case 'redo_card': {
-            // 重做卡：重置提交状态允许重新提交
-            if (!targetId) return res.status(400).json({ error: '请指定提交ID' });
-            db.prepare(`
-                UPDATE homework_submissions SET status = 'draft', score = NULL, final_score = NULL
-                WHERE id = ? AND student_id = ?
-            `).run(parseInt(targetId), user.id);
-            effectResult = { resetSubmission: targetId };
-            break;
+        effectResult = { newDueDate: newDue };
+    } else if (effect.allow_redo) {
+        // 重做卡：重置提交状态允许重新提交
+        if (!targetId) return res.status(400).json({ error: '请指定提交ID' });
+        const info = db.prepare(`
+            UPDATE homework_submissions SET status = 'draft', score = NULL
+            WHERE id = ? AND student_id = ?
+        `).run(parseInt(targetId), user.id);
+        if (info.changes === 0) return res.status(404).json({ error: '提交不存在' });
+        effectResult = { resetSubmission: targetId };
+    } else if (effect.hide_score) {
+        // 隐匿分数：本次成绩不计入排行榜
+        if (!targetId) return res.status(400).json({ error: '请指定提交ID' });
+        try { db.prepare('ALTER TABLE homework_submissions ADD COLUMN hide_from_rank INTEGER DEFAULT 0').run(); } catch (e) { /* 列已存在 */ }
+        const info = db.prepare('UPDATE homework_submissions SET hide_from_rank = 1 WHERE id = ? AND student_id = ?')
+            .run(parseInt(targetId), user.id);
+        if (info.changes === 0) return res.status(404).json({ error: '提交不存在' });
+        effectResult = { hidden: true };
+    } else if (effect.border || effect.theme || effect.badge) {
+        // 装饰类道具：存到用户的活跃装饰列表
+        try { db.prepare('ALTER TABLE users ADD COLUMN active_cosmetics TEXT DEFAULT \'[]\'').run(); } catch (e) { /* 列已存在 */ }
+        const cosmetics = JSON.parse(
+            (db.prepare('SELECT active_cosmetics FROM users WHERE id = ?').get(user.id)).active_cosmetics || '[]'
+        );
+        const tag = effect.border ? ('border:' + effect.border)
+            : effect.theme ? ('theme:' + effect.theme)
+            : ('badge:' + effect.badge);
+        if (!cosmetics.includes(tag)) {
+            cosmetics.push(tag);
+            db.prepare('UPDATE users SET active_cosmetics = ? WHERE id = ?').run(JSON.stringify(cosmetics), user.id);
         }
-        case 'cosmetic': {
-            // 装饰类道具：存到用户的活跃装饰列表
-            try {
-                db.prepare('ALTER TABLE users ADD COLUMN active_cosmetics TEXT DEFAULT \'[]\'').run();
-            } catch (e) { /* 列已存在 */ }
-            const cosmetics = JSON.parse(
-                (db.prepare('SELECT active_cosmetics FROM users WHERE id = ?').get(user.id)).active_cosmetics || '[]'
-            );
-            if (!cosmetics.includes(userItem.effect_value)) {
-                cosmetics.push(userItem.effect_value);
-                db.prepare('UPDATE users SET active_cosmetics = ? WHERE id = ?').run(JSON.stringify(cosmetics), user.id);
-            }
-            effectResult = { equipped: userItem.effect_value };
-            break;
-        }
-        case 'hide_score': {
-            // 隐匿分数：本次成绩不计入排行榜
-            if (!targetId) return res.status(400).json({ error: '请指定提交ID' });
-            try {
-                db.prepare('ALTER TABLE homework_submissions ADD COLUMN hide_from_rank INTEGER DEFAULT 0').run();
-            } catch (e) { /* 列已存在 */ }
-            db.prepare('UPDATE homework_submissions SET hide_from_rank = 1 WHERE id = ? AND student_id = ?')
-                .run(parseInt(targetId), user.id);
-            effectResult = { hidden: true };
-            break;
-        }
-        default:
-            return res.status(400).json({ error: '未知道具类型' });
+        effectResult = { equipped: tag };
+    } else {
+        return res.status(400).json({ error: '该道具暂无可用效果' });
     }
 
     // 扣除道具数量
@@ -182,8 +180,9 @@ router.get('/missions', (req, res) => {
 
     const result = missions.map(m => ({
         ...m,
-        progress: progressMap[m.id] ? progressMap[m.id].current_progress : 0,
-        claimed: progressMap[m.id] ? !!progressMap[m.id].claimed_at : false,
+        progress: progressMap[m.id] ? progressMap[m.id].progress : 0,
+        completed: progressMap[m.id] ? !!progressMap[m.id].completed : false,
+        claimed: progressMap[m.id] ? !!progressMap[m.id].claimed : false,
         lastUpdated: progressMap[m.id] ? progressMap[m.id].last_updated : null
     }));
 
@@ -203,16 +202,16 @@ router.post('/missions/:id/claim', (req, res) => {
         'SELECT * FROM user_mission_progress WHERE user_id = ? AND mission_id = ?'
     ).get(user.id, missionId);
 
-    if (!progress || progress.current_progress < mission.target_value) {
+    if (!progress || progress.progress < mission.condition_value) {
         return res.status(400).json({ error: '任务未完成' });
     }
-    if (progress.claimed_at) {
+    if (progress.claimed) {
         return res.status(400).json({ error: '奖励已领取' });
     }
 
     // 发放金币
-    db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(mission.reward_coins, user.id);
-    db.prepare('UPDATE user_mission_progress SET claimed_at = CURRENT_TIMESTAMP WHERE user_id = ? AND mission_id = ?')
+    db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(mission.reward, user.id);
+    db.prepare('UPDATE user_mission_progress SET claimed = 1, last_updated = CURRENT_TIMESTAMP WHERE user_id = ? AND mission_id = ?')
         .run(user.id, missionId);
 
     // 检查是否升级
@@ -222,7 +221,7 @@ router.post('/missions/:id/claim', (req, res) => {
         db.prepare('UPDATE users SET level = ? WHERE id = ?').run(newLevel, user.id);
     }
 
-    res.json({ success: true, rewardCoins: mission.reward_coins, totalCoins: userInfo.coins });
+    res.json({ success: true, rewardCoins: mission.reward, totalCoins: userInfo.coins });
 });
 
 // 触发任务进度更新（内部调用，由其他路由触发）
@@ -234,9 +233,9 @@ router.post('/missions/trigger', (req, res) => {
 
     if (!event) return res.status(400).json({ error: '缺少事件类型' });
 
-    // 查找匹配的任务
+    // 查找匹配的任务（按条件类型匹配）
     const missions = db.prepare(
-        'SELECT * FROM coin_missions WHERE trigger_event = ? AND is_active = 1'
+        'SELECT * FROM coin_missions WHERE condition_type = ? AND is_active = 1'
     ).all(event);
 
     const updated = [];
@@ -245,24 +244,32 @@ router.post('/missions/trigger', (req, res) => {
             'SELECT * FROM user_mission_progress WHERE user_id = ? AND mission_id = ?'
         ).get(user.id, mission.id);
 
+        const inc = parseInt(value) || 1;
+        let newProgress;
         if (!existing) {
+            newProgress = inc;
             db.prepare(
-                'INSERT INTO user_mission_progress (user_id, mission_id, current_progress) VALUES (?, ?, ?)'
-            ).run(user.id, mission.id, parseInt(value) || 1);
-        } else if (!existing.claimed_at) {
+                'INSERT INTO user_mission_progress (user_id, mission_id, progress) VALUES (?, ?, ?)'
+            ).run(user.id, mission.id, newProgress);
+        } else if (!existing.claimed) {
             // 对于 daily 类任务，检查今天是否已记录
-            if (mission.reset_period === 'daily') {
+            if (mission.type === 'daily') {
                 const today = new Date().toISOString().slice(0, 10);
                 const lastUpdate = existing.last_updated ? existing.last_updated.slice(0, 10) : '';
                 if (lastUpdate === today) continue;
-                db.prepare(
-                    'UPDATE user_mission_progress SET current_progress = current_progress + ?, last_updated = CURRENT_TIMESTAMP WHERE user_id = ? AND mission_id = ?'
-                ).run(parseInt(value) || 1, user.id, mission.id);
-            } else {
-                db.prepare(
-                    'UPDATE user_mission_progress SET current_progress = current_progress + ?, last_updated = CURRENT_TIMESTAMP WHERE user_id = ? AND mission_id = ?'
-                ).run(parseInt(value) || 1, user.id, mission.id);
             }
+            newProgress = existing.progress + inc;
+            db.prepare(
+                'UPDATE user_mission_progress SET progress = ?, last_updated = CURRENT_TIMESTAMP WHERE user_id = ? AND mission_id = ?'
+            ).run(newProgress, user.id, mission.id);
+        } else {
+            continue;
+        }
+
+        // 达成条件时标记完成
+        if (newProgress >= mission.condition_value) {
+            db.prepare('UPDATE user_mission_progress SET completed = 1 WHERE user_id = ? AND mission_id = ?')
+                .run(user.id, mission.id);
         }
         updated.push(mission.id);
     }

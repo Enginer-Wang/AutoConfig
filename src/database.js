@@ -147,6 +147,8 @@ function initDatabase() {
     try { db.exec("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'"); } catch(e) {}
     // 兼容旧版数据库：为 users 表添加 school 列（学校名称）
     try { db.exec("ALTER TABLE users ADD COLUMN school TEXT DEFAULT ''"); } catch(e) {}
+    // 兼容旧版数据库：为 users 表添加 school_level 列（学段：elementary/middle/high）
+    try { db.exec("ALTER TABLE users ADD COLUMN school_level TEXT DEFAULT ''"); } catch(e) {}
 
     // 兼容旧版数据库：为 projects 表添加学科分类字段
     try { db.exec("ALTER TABLE projects ADD COLUMN school_level TEXT DEFAULT ''"); } catch(e) {}
@@ -553,6 +555,7 @@ function initDatabase() {
             type TEXT DEFAULT 'consumable',
             effect TEXT DEFAULT '{}',
             icon TEXT DEFAULT '🎫',
+            is_active INTEGER DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     `);
@@ -584,6 +587,8 @@ function initDatabase() {
             condition_type TEXT NOT NULL,
             condition_value INTEGER DEFAULT 1,
             icon TEXT DEFAULT '🎯',
+            is_active INTEGER DEFAULT 1,
+            sort_order INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
     `);
@@ -799,6 +804,16 @@ function initDatabase() {
 
     // 兼容迁移：users 添加 level 列
     try { db.exec("ALTER TABLE users ADD COLUMN level INTEGER DEFAULT 1"); } catch(e) {}
+
+    // 兼容迁移：金币商店/任务的启用状态与排序列
+    try { db.exec("ALTER TABLE coin_items ADD COLUMN is_active INTEGER DEFAULT 1"); } catch(e) {}
+    try { db.exec("ALTER TABLE coin_missions ADD COLUMN is_active INTEGER DEFAULT 1"); } catch(e) {}
+    try { db.exec("ALTER TABLE coin_missions ADD COLUMN sort_order INTEGER DEFAULT 0"); } catch(e) {}
+
+    // 兼容迁移：道具使用效果相关列（迟交券个人延期、成绩免公示）
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN personal_due_date TEXT"); } catch(e) {}
+    try { db.exec("ALTER TABLE homework_submissions ADD COLUMN hide_from_rank INTEGER DEFAULT 0"); } catch(e) {}
+    try { db.exec("ALTER TABLE users ADD COLUMN active_cosmetics TEXT DEFAULT '[]'"); } catch(e) {}
 
     // ==================== 智能化班级与学生管理系统 ====================
 
