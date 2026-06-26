@@ -314,6 +314,23 @@ npm start
 
 ### 生产部署
 
+#### 方式零：一键更新 / 运行脚本（推荐）
+
+仓库内置 [`deploy.sh`](deploy.sh)，自动完成「拉取最新代码 → 按需安装依赖 → PM2 重启」，并保留 `data/` 数据：
+
+```bash
+# 在服务器上一键更新并运行
+bash deploy.sh
+
+# 自定义部署目录 / 分支（可选）
+APP_DIR=/home/autoconfig BRANCH=main bash deploy.sh
+
+# 远程一键执行
+curl -fsSL https://raw.githubusercontent.com/Enginer-Wang/AutoConfig/main/deploy.sh | bash
+```
+
+> 脚本特性：首次自动 `git clone`，之后增量更新；仅在 `package.json` / `package-lock.json` 变化时才重装依赖；`data/`（用户站点 + SQLite 数据库）已被 `.gitignore` 忽略，更新时不会被覆盖。
+
 #### 方式一：直接部署
 
 ```bash
