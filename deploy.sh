@@ -71,12 +71,23 @@ fi
 mkdir -p data
 
 # ---- 启动 / 重启服务 --------------------------------------------------------
+APP_SCRIPT="$APP_DIR/server.js"
 if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
-  log "重启 PM2 进程：$PM2_NAME"
-  pm2 restart "$PM2_NAME" --update-env
+  # 读取现有进程实际运行的脚本路径，判断是否指向本目录
+  CUR_SCRIPT="$(pm2 jlist 2>/dev/null \
+    | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const a=JSON.parse(s);const p=a.find(x=>x.name==='$PM2_NAME');process.stdout.write(p&&p.pm2_env&&p.pm2_env.pm_exec_path?p.pm2_env.pm_exec_path:'')}catch(e){}})" 2>/dev/null)"
+  if [ -n "$CUR_SCRIPT" ] && [ "$CUR_SCRIPT" != "$APP_SCRIPT" ]; then
+    warn "检测到 PM2 进程指向其它目录：$CUR_SCRIPT"
+    warn "重新绑定到本目录：$APP_SCRIPT"
+    pm2 delete "$PM2_NAME"
+    pm2 start "$APP_SCRIPT" --name "$PM2_NAME" --cwd "$APP_DIR"
+  else
+    log "重启 PM2 进程：$PM2_NAME"
+    pm2 restart "$PM2_NAME" --update-env
+  fi
 else
   log "首次启动 PM2 进程：$PM2_NAME"
-  pm2 start server.js --name "$PM2_NAME"
+  pm2 start "$APP_SCRIPT" --name "$PM2_NAME" --cwd "$APP_DIR"
 fi
 
 pm2 save
