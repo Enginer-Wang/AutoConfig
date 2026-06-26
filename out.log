@@ -1,0 +1,12 @@
+  ✅ 数据库初始化完成
+  🔌 WebSocket 实时通讯已启动 (/ws)
+
+  ⚡  Autoconfig 全功能平台已启动
+  ➜  Local:   http://localhost:3999/
+  ➜  控制台:  http://localhost:3999/dashboard
+  ➜  社区:    http://localhost:3999/community
+  ➜  聊天室:  http://localhost:3999/chat
+  ➜  管理后台: http://localhost:3999/admin
+  🔌 WebSocket: ws://localhost:3999/ws
+  👑  管理员:  admin / admin1234
+

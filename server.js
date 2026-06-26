@@ -41,10 +41,30 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// 静态文件服务 - 前端页面
-app.use('/css', express.static(path.join(__dirname, 'public/css')));
-app.use('/js', express.static(path.join(__dirname, 'public/js')));
-app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
+// 防缓存：HTML 页面强制每次回源，避免更新后浏览器/CDN 仍显示旧版本
+// 静态资源（css/js/assets）保留 ETag 协商缓存，由下方 static 处理
+app.use((req, res, next) => {
+    const p = req.path;
+    const isStaticOrApi =
+        p.startsWith('/css') ||
+        p.startsWith('/js') ||
+        p.startsWith('/assets') ||
+        p.startsWith('/api') ||
+        p.startsWith('/site') ||
+        /\.[a-zA-Z0-9]+$/.test(p); // 带扩展名的文件请求
+    if (req.method === 'GET' && !isStaticOrApi) {
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+    }
+    next();
+});
+
+// 静态文件服务 - 前端页面（启用协商缓存：内容变化时浏览器/CDN 会重新拉取）
+const staticOpts = { etag: true, lastModified: true, maxAge: 0 };
+app.use('/css', express.static(path.join(__dirname, 'public/css'), staticOpts));
+app.use('/js', express.static(path.join(__dirname, 'public/js'), staticOpts));
+app.use('/assets', express.static(path.join(__dirname, 'public/assets'), staticOpts));
 
 // API 路由
 app.use('/api/auth', authRoutes);

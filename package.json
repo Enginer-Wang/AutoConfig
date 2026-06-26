@@ -1,6 +1,6 @@
 {
     "name": "autoconfig",
-    "version": "1.0.0",
+    "version": "2.2.0",
     "description": "Autoconfig - 极速托管你的个人网页与项目",
     "main": "server.js",
     "scripts": {
