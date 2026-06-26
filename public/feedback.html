@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback - 意见与建议 | Autoconfig</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💡</text></svg>">
+    <style>
+        .feedback-page { max-width: 720px; margin: 0 auto; padding: 120px 20px 80px; }
+        .feedback-hero { text-align: center; margin-bottom: 40px; }
+        .feedback-hero h1 { font-size: 2.2rem; margin-bottom: 12px; }
+        .feedback-hero p { color: var(--text-secondary, #94a3b8); font-size: 1.05rem; }
+        .feedback-card {
+            background: var(--card-bg, rgba(255,255,255,0.04));
+            border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+            border-radius: 16px;
+            padding: 32px;
+            backdrop-filter: blur(10px);
+        }
+        .feedback-form .field { margin-bottom: 20px; }
+        .feedback-form label { display: block; margin-bottom: 8px; font-weight: 600; }
+        .feedback-form input,
+        .feedback-form select,
+        .feedback-form textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color, rgba(255,255,255,0.15));
+            background: rgba(255,255,255,0.03);
+            color: inherit;
+            font-size: 0.98rem;
+            font-family: inherit;
+            transition: border-color .2s;
+        }
+        .feedback-form input:focus,
+        .feedback-form select:focus,
+        .feedback-form textarea:focus {
+            outline: none;
+            border-color: var(--primary, #6366f1);
+        }
+        .feedback-form textarea { min-height: 140px; resize: vertical; }
+        .feedback-form .hint { font-size: 0.82rem; color: var(--text-secondary, #94a3b8); margin-top: 6px; }
+        .char-count { text-align: right; font-size: 0.8rem; color: var(--text-secondary, #94a3b8); margin-top: 4px; }
+        .feedback-submit {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .feedback-submit:disabled { opacity: .6; cursor: not-allowed; }
+        .feedback-success {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .feedback-success .icon { font-size: 3rem; margin-bottom: 16px; }
+        .feedback-success h2 { margin-bottom: 10px; }
+        .feedback-success p { color: var(--text-secondary, #94a3b8); }
+    </style>
+</head>
+<body>
+    <nav class="navbar scrolled" id="navbar"></nav>
+
+    <main class="feedback-page">
+        <div class="feedback-hero">
+            <h1>💡 意见与建议</h1>
+            <p>你的每一条建议都会帮助作者把平台做得更好。欢迎告诉我们你的想法！</p>
+        </div>
+
+        <div class="feedback-card">
+            <form class="feedback-form" id="feedbackForm">
+                <div class="field">
+                    <label for="category">反馈类型</label>
+                    <select id="category" name="category">
+                        <option value="suggestion">💬 优化建议</option>
+                        <option value="feature">✨ 功能需求</option>
+                        <option value="bug">🐛 问题反馈</option>
+                        <option value="other">📌 其他</option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="content">具体内容 <span style="color:#f87171">*</span></label>
+                    <textarea id="content" name="content" maxlength="2000" placeholder="请详细描述你的建议或遇到的问题……" required></textarea>
+                    <div class="char-count"><span id="charCount">0</span>/2000</div>
+                </div>
+
+                <div class="field">
+                    <label for="contact">联系方式（选填）</label>
+                    <input type="text" id="contact" name="contact" maxlength="120" placeholder="邮箱 / 微信 / QQ，方便作者回复你">
+                    <div class="hint">登录后提交将自动关联你的账号，无需重复填写。</div>
+                </div>
+
+                <button type="submit" class="btn btn-primary feedback-submit" id="submitBtn">提交反馈</button>
+            </form>
+
+            <div class="feedback-success" id="feedbackSuccess">
+                <div class="icon">🎉</div>
+                <h2>感谢你的反馈！</h2>
+                <p>作者已经收到，我们会认真考虑你的建议。</p>
+                <button class="btn btn-secondary" id="againBtn" style="margin-top:20px">再提一条</button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 Autoconfig. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/common.js"></script>
+    <script>
+        (async () => {
+            const user = await initNavbar('/feedback');
+
+            const form = document.getElementById('feedbackForm');
+            const contentEl = document.getElementById('content');
+            const charCount = document.getElementById('charCount');
+            const submitBtn = document.getElementById('submitBtn');
+            const successBox = document.getElementById('feedbackSuccess');
+            const againBtn = document.getElementById('againBtn');
+            const contactEl = document.getElementById('contact');
+
+            if (user) {
+                contactEl.placeholder = `已登录为 ${user.username}（选填其他联系方式）`;
+            }
+
+            contentEl.addEventListener('input', () => {
+                charCount.textContent = contentEl.value.length;
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const content = contentEl.value.trim();
+                if (!content) {
+                    showToast('请填写建议内容', 'error');
+                    return;
+                }
+                submitBtn.disabled = true;
+                submitBtn.textContent = '提交中…';
+                try {
+                    await api('/api/feedback', {
+                        method: 'POST',
+                        body: {
+                            category: document.getElementById('category').value,
+                            content,
+                            contact: contactEl.value.trim()
+                        }
+                    });
+                    form.style.display = 'none';
+                    successBox.style.display = 'block';
+                } catch (err) {
+                    showToast(err.message || '提交失败，请稍后再试', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '提交反馈';
+                }
+            });
+
+            againBtn.addEventListener('click', () => {
+                form.reset();
+                charCount.textContent = '0';
+                successBox.style.display = 'none';
+                form.style.display = 'block';
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -174,6 +174,7 @@ function renderNavbar(activePage) {
                 <a href="/leaderboard" ${isActive('/leaderboard')}>排行榜</a>
                 <a href="/homework" ${isActive('/homework')}>作业中心</a>
                 <a href="/classes" ${isActive('/classes')}>班级管理</a>
+                <a href="/feedback" ${isActive('/feedback')}>Feedback</a>
             </div>
             <div class="nav-actions" id="navActions">
                 <a href="/login" class="btn-login">登录</a>

@@ -216,6 +216,13 @@ function initDatabase() {
         // 列已存在，忽略
     }
 
+    // 迁移：给 class_members 添加 subject 列（协作教师所授学科；班级不再按学科分类，学科归属老师）
+    try {
+        db.exec(`ALTER TABLE class_members ADD COLUMN subject TEXT DEFAULT ''`);
+    } catch (e) {
+        // 列已存在，忽略
+    }
+
     // 作业表
     db.exec(`
         CREATE TABLE IF NOT EXISTS homework (
@@ -1002,6 +1009,22 @@ function initDatabase() {
             FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_group_configs_class ON group_configs(class_id);
+    `);
+
+    // 用户反馈/建议表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT DEFAULT '',
+            contact TEXT DEFAULT '',
+            category TEXT DEFAULT 'suggestion',
+            content TEXT NOT NULL,
+            status TEXT DEFAULT 'open',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at);
     `);
 
     // 兼容迁移：homework 添加作业大类字段

@@ -88,7 +88,7 @@ router.post('/create', (req, res) => {
 router.post('/join', (req, res) => {
     const db = getDb();
     const user = req.user;
-    const { inviteCode } = req.body;
+    const { inviteCode, subject } = req.body;
 
     if (!inviteCode || !inviteCode.trim()) {
         return res.status(400).json({ error: '请输入邀请码' });
@@ -110,7 +110,9 @@ router.post('/join', (req, res) => {
 
     // 教师以协作教师身份加入，学生以学生身份加入
     const memberRole = (user.role === 'teacher' || user.role === 'admin') ? 'co_teacher' : 'student';
-    db.prepare('INSERT INTO class_members (class_id, user_id, role) VALUES (?, ?, ?)').run(cls.id, user.id, memberRole);
+    // 学科归属老师：仅协作教师记录所授学科
+    const memberSubject = memberRole === 'co_teacher' ? (subject || '').toString().trim().slice(0, 20) : '';
+    db.prepare('INSERT INTO class_members (class_id, user_id, role, subject) VALUES (?, ?, ?, ?)').run(cls.id, user.id, memberRole, memberSubject);
     res.json({ success: true, class: { id: cls.id, name: cls.name }, role: memberRole });
 });
 
@@ -221,7 +223,7 @@ router.get('/:id', (req, res) => {
 
     const members = db.prepare(`
         SELECT u.id, u.username, u.avatar, u.role, u.email, u.school, u.bio, u.coins,
-            u.created_at as register_time, cm.joined_at, cm.role as class_role,
+            u.created_at as register_time, cm.joined_at, cm.role as class_role, cm.subject as teacher_subject,
             (SELECT COUNT(*) FROM homework_submissions hs 
              JOIN homework h ON hs.homework_id = h.id 
              WHERE hs.student_id = u.id AND h.class_id = ?) as submission_count,

@@ -27,6 +27,7 @@ const instantAssignmentRoutes = require('./src/routes/instantAssignment');
 const mistakesRoutes = require('./src/routes/mistakes');
 const liveRoutes = require('./src/routes/live');
 const classroomChatRoutes = require('./src/routes/classroomChat');
+const feedbackRoutes = require('./src/routes/feedback');
 const { authMiddleware, adminMiddleware } = require('./src/middleware/auth');
 
 const app = express();
@@ -66,6 +67,7 @@ app.use('/api/instant', instantAssignmentRoutes);
 app.use('/api/mistakes', mistakesRoutes);
 app.use('/api/live', liveRoutes);
 app.use('/api/classroom-chat', classroomChatRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // 已部署站点的路由 - /site/username/project 路径访问
 app.use('/site', siteRoutes);
@@ -89,6 +91,10 @@ app.get('/dashboard', (req, res) => {
 
 app.get('/community', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/community.html'));
+});
+
+app.get('/feedback', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/feedback.html'));
 });
 
 app.get('/docs', (req, res) => {

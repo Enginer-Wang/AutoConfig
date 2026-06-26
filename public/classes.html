@@ -158,7 +158,7 @@
             <div class="nav-section">
                 <div class="nav-label">导航</div>
                 <a class="nav-item active" onclick="showSection('overview')"><span class="icon">📊</span> 总览</a>
-                <a class="nav-item" onclick="showSection('members')"><span class="icon">👥</span> 学生管理</a>
+                <a class="nav-item" onclick="showSection('members')"><span class="icon">👥</span> <span id="membersNavLabel">学生管理</span></a>
                 <a class="nav-item" onclick="showSection('announcements')"><span class="icon">📢</span> 班级公告</a>
                 <a class="nav-item" onclick="showSection('analytics')"><span class="icon">📈</span> 数据分析</a>
             </div>
@@ -199,7 +199,7 @@
                     <div class="panel-body">
                         <table class="data-table">
                             <thead>
-                                <tr><th>班级</th><th>学科</th><th>学段</th><th>学生</th><th>作业</th><th>平均分</th><th>我的身份</th><th>操作</th></tr>
+                                <tr><th>班级</th><th>学段</th><th>学生</th><th>作业</th><th>平均分</th><th>我的身份</th><th>操作</th></tr>
                             </thead>
                             <tbody id="classesTable"></tbody>
                         </table>
@@ -240,7 +240,7 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label>班级名称 *</label>
-                    <input type="text" class="form-input" id="className" placeholder="如：高一(3)班物理" maxlength="50">
+                    <input type="text" class="form-input" id="className" placeholder="如：高一(3)班" maxlength="50">
                 </div>
                 <div class="form-group">
                     <label>班级描述</label>
@@ -257,8 +257,8 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>学科</label>
-                        <input type="text" class="form-input" id="classSubject" placeholder="如：物理" maxlength="20">
+                        <label>我授课的学科</label>
+                        <input type="text" class="form-input" id="classSubject" placeholder="如：物理（班级不分学科，学科归老师）" maxlength="20">
                     </div>
                 </div>
             </div>
@@ -280,6 +280,10 @@
                 <div class="form-group">
                     <label>邀请码</label>
                     <input type="text" class="form-input" id="inviteCode" placeholder="输入6位邀请码" maxlength="6" style="text-transform:uppercase;letter-spacing:3px;text-align:center;font-size:1.3rem;padding:14px">
+                </div>
+                <div class="form-group" id="joinSubjectGroup" style="display:none">
+                    <label>我授课的学科（教师填写）</label>
+                    <input type="text" class="form-input" id="joinSubject" placeholder="如：数学" maxlength="20">
                 </div>
                 <p style="font-size:.82rem;color:#64748b;margin-top:8px">教师加入后将成为协作教师，学生加入后成为班级学生</p>
             </div>
@@ -317,8 +321,8 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>学科</label>
-                        <input type="text" class="form-input" id="editClassSubject" maxlength="20">
+                        <label>我授课的学科</label>
+                        <input type="text" class="form-input" id="editClassSubject" placeholder="如：物理" maxlength="20">
                     </div>
                 </div>
             </div>
@@ -347,6 +351,7 @@
         let currentClassId = null;
         let currentClassData = null;
         let editingClassId = null;
+        let isStudentView = false;
 
         (async () => {
             currentUser = await checkAuth();
@@ -354,8 +359,16 @@
             document.getElementById('headerUser').textContent = currentUser.username;
             // 学生隐藏创建按钮，只显示加入
             if (currentUser.role !== 'teacher' && currentUser.role !== 'admin') {
+                isStudentView = true;
                 const createBtn = document.querySelector('[onclick="openModal(\'createModal\')"]');
                 if (createBtn) createBtn.style.display = 'none';
+                // 学生角色：将“学生管理”替换为“班级”
+                const navLabel = document.getElementById('membersNavLabel');
+                if (navLabel) navLabel.textContent = '班级';
+            } else {
+                // 教师/管理员加入班级时填写所授学科
+                const jsg = document.getElementById('joinSubjectGroup');
+                if (jsg) jsg.style.display = 'block';
             }
             await loadClasses();
         })();
@@ -407,7 +420,6 @@
             document.getElementById('classesTable').innerHTML = classes.length ? classes.map(c => `
                 <tr>
                     <td class="username" style="cursor:pointer" onclick="selectClass(${c.id})">${esc(c.name)}</td>
-                    <td>${esc(c.subject || '-')}</td>
                     <td>${levelMap[c.school_level] || '-'}</td>
                     <td>${c.member_count || 0}</td>
                     <td>-</td>
@@ -418,12 +430,12 @@
                         ${c.my_role === 'owner' ? `<button class="btn btn-sm btn-warning" onclick="editClass(${c.id})">编辑</button><button class="btn btn-sm btn-danger" onclick="deleteClass(${c.id})">删除</button>` : ''}
                     </td>
                 </tr>
-            `).join('') : '<tr><td colspan="8" class="empty-msg">暂无班级数据</td></tr>';
+            `).join('') : '<tr><td colspan="7" class="empty-msg">暂无班级数据</td></tr>';
         }
 
         function filterClasses() {
             const q = document.getElementById('classSearch').value.trim().toLowerCase();
-            const filtered = q ? allClasses.filter(c => c.name.toLowerCase().includes(q) || (c.subject || '').toLowerCase().includes(q)) : allClasses;
+            const filtered = q ? allClasses.filter(c => c.name.toLowerCase().includes(q)) : allClasses;
             renderClassesTable(filtered);
         }
 
@@ -447,6 +459,12 @@
             const students = members.filter(m => m.class_role === 'student');
             const coTeachers = members.filter(m => m.class_role === 'co_teacher');
 
+            // 学生视角：展示教师与同班同学
+            if (isStudentView && !isTeacher) {
+                renderStudentClassSection(data, students, coTeachers);
+                return;
+            }
+
             let html = `
                 <div class="stats-grid">
                     <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">${stats.total_members}</div><div class="stat-label">学生人数</div></div>
@@ -466,16 +484,23 @@
                 </div>
             `;
 
-            // 协作教师列表
-            if (coTeachers.length > 0) {
-                html += `<div class="panel" style="margin-bottom:16px"><div class="panel-header"><h2>👨‍🏫 协作教师 (${coTeachers.length})</h2></div><div class="panel-body"><table class="data-table"><thead><tr><th>教师</th><th>加入时间</th><th>操作</th></tr></thead><tbody>`;
-                html += coTeachers.map(m => `<tr>
-                    <td class="username">${esc(m.username)}</td>
-                    <td>${formatDate(m.joined_at)}</td>
-                    <td class="actions-cell">${isTeacher ? `<button class="btn btn-sm btn-danger" onclick="removeMember(${cls.id},${m.id})">移除</button>` : ''}</td>
-                </tr>`).join('');
-                html += `</tbody></table></div></div>`;
-            }
+            // 任课教师列表（班主任 + 协作教师），学科归属老师
+            html += `<div class="panel" style="margin-bottom:16px"><div class="panel-header"><h2>👨‍🏫 任课教师 (${1 + coTeachers.length})</h2></div><div class="panel-body"><table class="data-table"><thead><tr><th>学科</th><th>教师</th><th>身份</th><th>加入时间</th><th>操作</th></tr></thead><tbody>`;
+            html += `<tr>
+                <td><span class="badge badge-teacher">${esc(cls.subject || '未设置')}</span></td>
+                <td class="username">${esc(cls.teacher_name)}</td>
+                <td><span class="badge badge-owner">班主任</span></td>
+                <td>-</td>
+                <td class="actions-cell">-</td>
+            </tr>`;
+            html += coTeachers.map(m => `<tr>
+                <td><span class="badge badge-teacher">${esc(m.teacher_subject || '未设置')}</span></td>
+                <td class="username">${esc(m.username)}</td>
+                <td><span class="badge badge-co-teacher">协作教师</span></td>
+                <td>${formatDate(m.joined_at)}</td>
+                <td class="actions-cell">${isTeacher ? `<button class="btn btn-sm btn-danger" onclick="removeMember(${cls.id},${m.id})">移除</button>` : ''}</td>
+            </tr>`).join('');
+            html += `</tbody></table></div></div>`;
 
             // 学生列表
             html += `
@@ -506,6 +531,74 @@
 
             document.getElementById('membersContent').innerHTML = html;
             renderMembersTable(students);
+        }
+
+        // 学生视角：教师 + 同班同学
+        function renderStudentClassSection(data, students, coTeachers) {
+            const { class: cls } = data;
+            const levelMap = { elementary: '小学', middle: '初中', high: '高中' };
+
+            let html = `
+                <div class="panel" style="margin-bottom:16px">
+                    <div class="panel-header"><h2>📋 班级信息</h2></div>
+                    <div class="panel-body">
+                        <div class="student-info-grid">
+                            <div class="student-info-item"><div class="label">班级名称</div><div class="value">${esc(cls.name)}</div></div>
+                            <div class="student-info-item"><div class="label">学段</div><div class="value">${levelMap[cls.school_level] || '-'}</div></div>
+                            <div class="student-info-item"><div class="label">任课教师</div><div class="value">${1 + coTeachers.length} 位</div></div>
+                            <div class="student-info-item"><div class="label">同学人数</div><div class="value">${students.length}</div></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 任课教师（班主任 + 协作教师），按学科展示
+            html += `
+                <div class="panel" style="margin-bottom:16px">
+                    <div class="panel-header"><h2>👨‍🏫 任课教师</h2></div>
+                    <div class="panel-body"><table class="data-table"><thead><tr><th>学科</th><th>教师</th><th>身份</th></tr></thead><tbody>`;
+            html += `<tr><td><span class="badge badge-teacher">${esc(cls.subject || '未设置')}</span></td><td class="username">${esc(cls.teacher_name)}</td><td><span class="badge badge-owner">班主任</span></td></tr>`;
+            html += coTeachers.map(m => `<tr><td><span class="badge badge-teacher">${esc(m.teacher_subject || '未设置')}</span></td><td class="username">${esc(m.username)}</td><td><span class="badge badge-co-teacher">协作教师</span></td></tr>`).join('');
+            html += `</tbody></table></div></div>`;
+
+            // 同班同学
+            html += `
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>👥 同班同学 (${students.length})</h2>
+                        <div class="panel-toolbar">
+                            <input class="form-input form-input-sm" id="classmateSearch" placeholder="搜索同学..." oninput="filterClassmates()">
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <table class="data-table">
+                            <thead><tr><th>同学</th><th>学校</th></tr></thead>
+                            <tbody id="classmatesTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('membersContent').innerHTML = html;
+            renderClassmatesTable(students);
+        }
+
+        function renderClassmatesTable(students) {
+            const me = currentUser?.id;
+            document.getElementById('classmatesTable').innerHTML = students.length ? students.map(m => `
+                <tr>
+                    <td class="username">${esc(m.username)}${m.id === me ? ' <span style="font-size:.7rem;color:#818cf8">（我）</span>' : ''}</td>
+                    <td>${esc(m.school || '-')}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="2" class="empty-msg">暂无同学</td></tr>';
+        }
+
+        function filterClassmates() {
+            if (!currentClassData) return;
+            const q = (document.getElementById('classmateSearch')?.value || '').trim().toLowerCase();
+            let students = currentClassData.members.filter(m => m.class_role === 'student');
+            if (q) students = students.filter(m => m.username.toLowerCase().includes(q) || (m.school || '').toLowerCase().includes(q));
+            renderClassmatesTable(students);
         }
 
         function renderMembersTable(students) {
@@ -752,11 +845,15 @@
         async function joinClass() {
             const code = document.getElementById('inviteCode').value.trim();
             if (!code) { showToast('请输入邀请码', 'error'); return; }
+            const isTeacherRole = currentUser && (currentUser.role === 'teacher' || currentUser.role === 'admin');
+            const subject = isTeacherRole ? document.getElementById('joinSubject').value.trim() : '';
             try {
-                const data = await api('/api/classes/join', { method: 'POST', body: { inviteCode: code } });
+                const data = await api('/api/classes/join', { method: 'POST', body: { inviteCode: code, subject } });
                 showToast(`成功加入班级「${data.class.name}」，身份：${data.role === 'co_teacher' ? '协作教师' : '学生'}`, 'success');
                 closeModal('joinModal');
                 document.getElementById('inviteCode').value = '';
+                const js = document.getElementById('joinSubject');
+                if (js) js.value = '';
                 await loadClasses();
             } catch (err) { showToast(err.message, 'error'); }
         }
@@ -823,7 +920,7 @@
             if (target) target.classList.add('active');
             document.querySelectorAll('.cls-sidebar .nav-item').forEach(el => el.classList.remove('active'));
             event.currentTarget?.classList.add('active');
-            const titles = { overview: '📊 班级总览', members: '👥 学生管理', announcements: '📢 班级公告', analytics: '📈 数据分析' };
+            const titles = { overview: '📊 班级总览', members: isStudentView ? '👥 我的班级' : '👥 学生管理', announcements: '📢 班级公告', analytics: '📈 数据分析' };
             document.getElementById('pageTitle').textContent = titles[name] || '';
         }
 
